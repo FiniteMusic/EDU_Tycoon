@@ -427,7 +427,7 @@ class GameScreen(game: Main) : BaseScreen(game) {
                             currentInfoWindow = BuildingInfoWindow(propiedad) {
                                 // Invalidar HUD y refrescar la textura cacheada del entry
                                 hudDirty = true
-                                invalidateRenderEntry(propId)
+                                invalidateRenderEntry(propiedad.id)
                                 Gdx.app.log("GAME", "${propiedad.nombre} → nivel ${propiedad.nivel}")
                             }
                             currentInfoWindow?.show(stage)
