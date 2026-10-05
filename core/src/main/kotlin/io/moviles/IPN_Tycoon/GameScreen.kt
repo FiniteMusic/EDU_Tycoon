@@ -40,6 +40,7 @@ import ktx.actors.onChange
 import ktx.app.clearScreen
 import ktx.assets.toInternalFile
 import ktx.scene2d.*
+import io.moviles.IPN_Tycoon.rendering.BuildingRenderer
 
 class GameScreen(game: Main) : BaseScreen(game) {
 
@@ -81,6 +82,7 @@ class GameScreen(game: Main) : BaseScreen(game) {
             .toIntArray()
     }
 
+    private val buildingRenderer = BuildingRenderer()
     // ── Cámara ────────────────────────────────────────────────────────
     private val camera = OrthographicCamera().apply {
         setToOrtho(false, 800f, 480f)
@@ -650,14 +652,13 @@ class GameScreen(game: Main) : BaseScreen(game) {
                 // Culling 2D usando coordenadas del EDIFICIO
                 if (!isVisible(entry.bWorldX, entry.bWorldY, p.renderW, p.renderH)) continue
 
-                var drawY = entry.bWorldY
-                val drawX = entry.bDrawX
-                val w = p.renderW
-                val h = p.renderH
-
-                r.batch.draw(tex, drawX, drawY, w, h)
-
-                r.batch.draw(tex, drawX, drawY, w, h)
+                buildingRenderer.render(
+                    batch = r.batch,
+                    texture = tex,
+                    propiedad = p,
+                    drawX = entry.bDrawX,
+                    drawY = entry.bWorldY
+                )
             }
 
             // ====================== ETIQUETAS (solo si cerca) ======================
