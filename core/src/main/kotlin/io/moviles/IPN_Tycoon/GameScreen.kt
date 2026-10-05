@@ -658,7 +658,10 @@ class GameScreen(game: Main) : BaseScreen(game) {
                 // Culling 2D usando coordenadas del EDIFICIO
                 if (!isVisible(entry.bWorldX, entry.bWorldY, p.renderW, p.renderH)) continue
 
-                val animatedElements = buildingAnimations.getElements(p.id)
+                val animatedElements = buildingAnimations.getElements(
+                    buildingId = p.id,
+                    level = p.nivel
+                )
 
                 buildingRenderer.render(
                     batch = r.batch,

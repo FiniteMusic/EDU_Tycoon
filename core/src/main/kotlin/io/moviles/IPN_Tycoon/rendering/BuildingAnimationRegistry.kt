@@ -34,21 +34,55 @@ class BuildingAnimationRegistry {
         )
 
         return listOf(
+
+            // Nivel 1
             AnimatedElement(
                 animation = studentAnimation,
                 offsetX = 1400f,
                 offsetY = 480f,
                 width = 180f,
                 height = 240f,
-                movementX = 900f,
-                movementY = -425f,
+                movementX = 600f,
+                movementY = -300f,
                 movementDuration = 5f
+            ),
+
+            // Nivel 2
+            AnimatedElement(
+                animation = studentAnimation,
+                offsetX = 1300f,
+                offsetY = 410f,
+                width = 180f,
+                height = 240f,
+                movementX = 650f,
+                movementY = -300f,
+                movementDuration = 6f
+            ),
+
+            // Nivel 3
+            AnimatedElement(
+                animation = studentAnimation,
+                offsetX = 1750f,
+                offsetY = 300f,
+                width = 180f,
+                height = 240f,
+                movementX = 600f,
+                movementY = -280f,
+                movementDuration = 4.5f
             )
         )
     }
 
-    fun getElements(buildingId: String): List<AnimatedElement> {
-        return animationsByBuilding[buildingId] ?: emptyList()
+    fun getElements(
+        buildingId: String,
+        level: Int
+    ): List<AnimatedElement> {
+
+        val elements = animationsByBuilding[buildingId] ?: return emptyList()
+
+        return elements.take(
+            level.coerceIn(0, elements.size)
+        )
     }
 
     fun dispose() {
