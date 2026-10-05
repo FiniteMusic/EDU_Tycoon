@@ -11,8 +11,11 @@ class BuildingRenderer {
         texture: Texture,
         propiedad: Propiedad,
         drawX: Float,
-        drawY: Float
+        drawY: Float,
+        stateTime: Float,
+        animatedElements: List<AnimatedElement> = emptyList()
     ) {
+        // Base estática del edificio
         batch.draw(
             texture,
             drawX,
@@ -20,5 +23,18 @@ class BuildingRenderer {
             propiedad.renderW,
             propiedad.renderH
         )
+
+        // Elementos animados superpuestos
+        animatedElements.forEach { element ->
+            val frame = element.animation.getFrame(stateTime)
+
+            batch.draw(
+                frame,
+                drawX + element.offsetX,
+                drawY + element.offsetY,
+                element.width,
+                element.height
+            )
+        }
     }
 }

@@ -96,7 +96,7 @@ class GameScreen(game: Main) : BaseScreen(game) {
     // Reusable para no generar GC cada frame
     private val screenRect = Rectangle()
     private val tempVec2   = Vector2()
-
+    private var animationStateTime = 0f
     /**
      * Actualiza screenRect con los límites del mundo visibles en pantalla.
      * Mucho más rápido que frustum.boundsInFrustum para sprites 2D isométricos.
@@ -612,6 +612,7 @@ class GameScreen(game: Main) : BaseScreen(game) {
         clearScreen(0f, 0f, 0f, 1f)
 
         if (modoCarga) {
+            animationStateTime += delta
             actualizarCamara()      // También llama updateScreenRect()
             renderizarMundo(delta)
             actualizarCicloDeJuego(delta)
@@ -657,7 +658,8 @@ class GameScreen(game: Main) : BaseScreen(game) {
                     texture = tex,
                     propiedad = p,
                     drawX = entry.bDrawX,
-                    drawY = entry.bWorldY
+                    drawY = entry.bWorldY,
+                    stateTime = animationStateTime
                 )
             }
 
