@@ -87,7 +87,7 @@ class GameScreen(game: Main) : BaseScreen(game) {
 
     private val buildingRenderer = BuildingRenderer()
 
-    private val escomStudentTextures: List<Texture> by lazy {
+    private val escomStudentTexturesDelegate = lazy {
         (1..4).map { frame ->
             Texture(
                 "Mapa/animaciones/escom/estudiante_walk_%02d.png"
@@ -96,6 +96,9 @@ class GameScreen(game: Main) : BaseScreen(game) {
             )
         }
     }
+
+    private val escomStudentTextures: List<Texture>
+        by escomStudentTexturesDelegate
 
     private val escomStudentAnimation: BuildingAnimation by lazy {
         val frames = escomStudentTextures
@@ -814,6 +817,9 @@ class GameScreen(game: Main) : BaseScreen(game) {
         buildingTextureCache.values.forEach { it?.dispose() }
         buildingTextureCache.clear()
         map?.dispose()
+        if (escomStudentTexturesDelegate.isInitialized()) {
+            escomStudentTextures.forEach { it.dispose() }
+        }
     }
 
     // ── Tutorial ──────────────────────────────────────────────────────
