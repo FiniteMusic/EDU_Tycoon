@@ -28,12 +28,14 @@ class BuildingRenderer {
 
         // Elementos animados superpuestos
         animatedElements.forEach { element ->
-            val frame = element.animation.getFrame(stateTime)
+            val originalFrame = element.animation.getFrame(stateTime)
 
             val duration = element.movementDuration.coerceAtLeast(0.01f)
             val cyclePosition = (stateTime % (duration * 2f)) / duration
 
-            val progress = if (cyclePosition <= 1f) {
+            val isReturning = cyclePosition > 1f
+
+            val progress = if (!isReturning) {
                 cyclePosition
             } else {
                 2f - cyclePosition
@@ -41,6 +43,14 @@ class BuildingRenderer {
 
             val currentX = element.offsetX + element.movementX * progress
             val currentY = element.offsetY + element.movementY * progress
+
+            val frame = if (isReturning) {
+                TextureRegion(originalFrame).apply {
+                    flip(true, false)
+                }
+            } else {
+                originalFrame
+            }
 
             batch.draw(
                 frame,
