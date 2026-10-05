@@ -41,7 +41,6 @@ import ktx.app.clearScreen
 import ktx.assets.toInternalFile
 import ktx.scene2d.*
 import io.moviles.IPN_Tycoon.rendering.BuildingRenderer
-import kotlin.collections.emptyList
 import io.moviles.IPN_Tycoon.rendering.BuildingAnimationRegistry
 
 class GameScreen(game: Main) : BaseScreen(game) {
