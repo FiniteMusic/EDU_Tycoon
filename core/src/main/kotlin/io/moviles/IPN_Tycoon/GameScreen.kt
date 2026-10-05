@@ -54,15 +54,6 @@ class GameScreen(game: Main) : BaseScreen(game) {
     // ── Ajustes de Optimización ──────────────────────────────────────
     private val maxZoom                = 7.0f
     private val maxZoomForLabels       = 4.0f
-    private val maxZoomForFullBuildings = 5.8f
-
-    // Offset vertical para edificios generales al encogerse (LOD)
-    private val smallBuildingYOffset = mapOf(
-        "Edificio1" to 35f,
-        "Edificio2" to 35f,
-        "edificio1" to 35f,
-        "edificio2" to 35f
-    )
 
     init {
         cycleEngine.addListener(economyEngine)
@@ -647,7 +638,7 @@ class GameScreen(game: Main) : BaseScreen(game) {
             r.batch.color = Color.WHITE
 
             val drawLabels    = zoom <= maxZoomForLabels
-            val useSmallScale = zoom > maxZoomForFullBuildings
+
 
             // ====================== EDIFICIOS COMPRADOS ======================
             for (entry in renderEntries) {
@@ -660,21 +651,11 @@ class GameScreen(game: Main) : BaseScreen(game) {
                 if (!isVisible(entry.bWorldX, entry.bWorldY, p.renderW, p.renderH)) continue
 
                 var drawY = entry.bWorldY
-                var scale = 1f
+                val drawX = entry.bDrawX
+                val w = p.renderW
+                val h = p.renderH
 
-                // LOD + Fix visual para Edificios generales
-                if (useSmallScale) {
-                    scale = 0.72f
-                    // Subir un poco los edificios 1 y 2 cuando se encogen para que no se hundan
-                    smallBuildingYOffset[p.id]?.let { offset ->
-                        drawY += offset * (zoom - maxZoomForFullBuildings) / 2f
-                    }
-                }
-
-                val w = p.renderW * scale
-                val h = p.renderH * scale
-                // Centrar horizontalmente al escalar (usando el centro original bWorldX)
-                val drawX = entry.bDrawX + (p.renderW - w) * 0.5f
+                r.batch.draw(tex, drawX, drawY, w, h)
 
                 r.batch.draw(tex, drawX, drawY, w, h)
             }
