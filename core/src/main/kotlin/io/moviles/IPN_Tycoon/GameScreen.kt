@@ -41,9 +41,8 @@ import ktx.app.clearScreen
 import ktx.assets.toInternalFile
 import ktx.scene2d.*
 import io.moviles.IPN_Tycoon.rendering.BuildingRenderer
-import io.moviles.IPN_Tycoon.rendering.AnimatedElement
-import io.moviles.IPN_Tycoon.rendering.BuildingAnimation
 import kotlin.collections.emptyList
+import io.moviles.IPN_Tycoon.rendering.BuildingAnimationRegistry
 
 class GameScreen(game: Main) : BaseScreen(game) {
 
@@ -86,44 +85,10 @@ class GameScreen(game: Main) : BaseScreen(game) {
     }
 
     private val buildingRenderer = BuildingRenderer()
+    private val buildingAnimations = BuildingAnimationRegistry()
 
-    private val escomStudentTexturesDelegate = lazy {
-        (1..4).map { frame ->
-            Texture(
-                "Mapa/animaciones/escom/estudiante_walk_%02d.png"
-                    .format(frame)
-                    .toInternalFile()
-            )
-        }
-    }
 
-    private val escomStudentTextures: List<Texture>
-        by escomStudentTexturesDelegate
 
-    private val escomStudentAnimation: BuildingAnimation by lazy {
-        val frames = escomStudentTextures
-            .map { TextureRegion(it) }
-            .toTypedArray()
-
-        BuildingAnimation(
-            frames = frames,
-            frameDuration = 0.15f
-        )
-    }
-    private val escomAnimatedElements: List<AnimatedElement> by lazy {
-        listOf(
-            AnimatedElement(
-                animation = escomStudentAnimation,
-                offsetX = 1400f,
-                offsetY = 480f,
-                width = 180f,
-                height = 240f,
-                movementX = 900f,
-                movementY = -425f,
-                movementDuration = 5f
-            )
-        )
-    }
     // ── Cámara ────────────────────────────────────────────────────────
     private val camera = OrthographicCamera().apply {
         setToOrtho(false, 800f, 480f)
@@ -694,12 +659,7 @@ class GameScreen(game: Main) : BaseScreen(game) {
                 // Culling 2D usando coordenadas del EDIFICIO
                 if (!isVisible(entry.bWorldX, entry.bWorldY, p.renderW, p.renderH)) continue
 
-                val animatedElements =
-                    if (p.id == "escom_hitbox") {
-                        escomAnimatedElements
-                    } else {
-                        emptyList()
-                    }
+                val animatedElements = buildingAnimations.getElements(p.id)
 
                 buildingRenderer.render(
                     batch = r.batch,
@@ -817,9 +777,7 @@ class GameScreen(game: Main) : BaseScreen(game) {
         buildingTextureCache.values.forEach { it?.dispose() }
         buildingTextureCache.clear()
         map?.dispose()
-        if (escomStudentTexturesDelegate.isInitialized()) {
-            escomStudentTextures.forEach { it.dispose() }
-        }
+        buildingAnimations.dispose()
     }
 
     // ── Tutorial ──────────────────────────────────────────────────────
