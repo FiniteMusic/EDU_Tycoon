@@ -40,6 +40,8 @@ import ktx.actors.onChange
 import ktx.app.clearScreen
 import ktx.assets.toInternalFile
 import ktx.scene2d.*
+import io.moviles.IPN_Tycoon.rendering.BuildingRenderer
+import io.moviles.IPN_Tycoon.rendering.BuildingAnimationRegistry
 
 class GameScreen(game: Main) : BaseScreen(game) {
 
@@ -54,15 +56,6 @@ class GameScreen(game: Main) : BaseScreen(game) {
     // ── Ajustes de Optimización ──────────────────────────────────────
     private val maxZoom                = 7.0f
     private val maxZoomForLabels       = 4.0f
-    private val maxZoomForFullBuildings = 5.8f
-
-    // Offset vertical para edificios generales al encogerse (LOD)
-    private val smallBuildingYOffset = mapOf(
-        "Edificio1" to 35f,
-        "Edificio2" to 35f,
-        "edificio1" to 35f,
-        "edificio2" to 35f
-    )
 
     init {
         cycleEngine.addListener(economyEngine)
@@ -90,6 +83,11 @@ class GameScreen(game: Main) : BaseScreen(game) {
             .toIntArray()
     }
 
+    private val buildingRenderer = BuildingRenderer()
+    private val buildingAnimations = BuildingAnimationRegistry()
+
+
+
     // ── Cámara ────────────────────────────────────────────────────────
     private val camera = OrthographicCamera().apply {
         setToOrtho(false, 800f, 480f)
@@ -103,7 +101,7 @@ class GameScreen(game: Main) : BaseScreen(game) {
     // Reusable para no generar GC cada frame
     private val screenRect = Rectangle()
     private val tempVec2   = Vector2()
-
+    private var animationStateTime = 0f
     /**
      * Actualiza screenRect con los límites del mundo visibles en pantalla.
      * Mucho más rápido que frustum.boundsInFrustum para sprites 2D isométricos.
@@ -429,7 +427,7 @@ class GameScreen(game: Main) : BaseScreen(game) {
                             currentInfoWindow = BuildingInfoWindow(propiedad) {
                                 // Invalidar HUD y refrescar la textura cacheada del entry
                                 hudDirty = true
-                                invalidateRenderEntry(propId)
+                                invalidateRenderEntry(propiedad.id)
                                 Gdx.app.log("GAME", "${propiedad.nombre} → nivel ${propiedad.nivel}")
                             }
                             currentInfoWindow?.show(stage)
@@ -619,6 +617,7 @@ class GameScreen(game: Main) : BaseScreen(game) {
         clearScreen(0f, 0f, 0f, 1f)
 
         if (modoCarga) {
+            animationStateTime += delta
             actualizarCamara()      // También llama updateScreenRect()
             renderizarMundo(delta)
             actualizarCicloDeJuego(delta)
@@ -647,7 +646,7 @@ class GameScreen(game: Main) : BaseScreen(game) {
             r.batch.color = Color.WHITE
 
             val drawLabels    = zoom <= maxZoomForLabels
-            val useSmallScale = zoom > maxZoomForFullBuildings
+
 
             // ====================== EDIFICIOS COMPRADOS ======================
             for (entry in renderEntries) {
@@ -659,24 +658,20 @@ class GameScreen(game: Main) : BaseScreen(game) {
                 // Culling 2D usando coordenadas del EDIFICIO
                 if (!isVisible(entry.bWorldX, entry.bWorldY, p.renderW, p.renderH)) continue
 
-                var drawY = entry.bWorldY
-                var scale = 1f
+                val animatedElements = buildingAnimations.getElements(
+                    buildingId = p.id,
+                    level = p.nivel
+                )
 
-                // LOD + Fix visual para Edificios generales
-                if (useSmallScale) {
-                    scale = 0.72f
-                    // Subir un poco los edificios 1 y 2 cuando se encogen para que no se hundan
-                    smallBuildingYOffset[p.id]?.let { offset ->
-                        drawY += offset * (zoom - maxZoomForFullBuildings) / 2f
-                    }
-                }
-
-                val w = p.renderW * scale
-                val h = p.renderH * scale
-                // Centrar horizontalmente al escalar (usando el centro original bWorldX)
-                val drawX = entry.bDrawX + (p.renderW - w) * 0.5f
-
-                r.batch.draw(tex, drawX, drawY, w, h)
+                buildingRenderer.render(
+                    batch = r.batch,
+                    texture = tex,
+                    propiedad = p,
+                    drawX = entry.bDrawX,
+                    drawY = entry.bWorldY,
+                    stateTime = animationStateTime,
+                    animatedElements = animatedElements
+                )
             }
 
             // ====================== ETIQUETAS (solo si cerca) ======================
@@ -784,6 +779,7 @@ class GameScreen(game: Main) : BaseScreen(game) {
         buildingTextureCache.values.forEach { it?.dispose() }
         buildingTextureCache.clear()
         map?.dispose()
+        buildingAnimations.dispose()
     }
 
     // ── Tutorial ──────────────────────────────────────────────────────
