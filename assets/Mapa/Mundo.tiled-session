@@ -1,14 +1,17 @@
 {
-    "activeFile": "Edificio1Mini.tsx",
+    "activeFile": "Mapa_General.tmx",
     "expandedProjectPaths": [
-        ".",
+        "calles/construcciones",
         "calles",
-        "calles/construcciones"
+        "."
     ],
     "fileStates": {
+        "": {
+            "scaleInDock": 1
+        },
         "Edificio1Mini.tsx": {
             "dynamicWrapping": true,
-            "scaleInDock": 1,
+            "scaleInDock": 0.33,
             "scaleInEditor": 1
         },
         "EdificioESCOM.tsx": {
@@ -17,17 +20,46 @@
             "scaleInEditor": 1
         },
         "Mapa_General.tmx": {
-            "scale": 0.25,
-            "selectedLayer": 3,
+            "scale": 0.75,
+            "selectedLayer": 7,
             "viewCenter": {
-                "x": 2434,
-                "y": 1082
+                "x": 18025.333333333332,
+                "y": 1350
             }
         },
-        "calles/calles.tsx": {
+        "Mapa_General.tmx#Biologicas": {
+            "dynamicWrapping": true,
+            "scaleInDock": 1
+        },
+        "Mapa_General.tmx#Bioquimica": {
+            "scaleInDock": 1
+        },
+        "Mapa_General.tmx#Direccion": {
+            "dynamicWrapping": true,
+            "scaleInDock": 0.125
+        },
+        "Mapa_General.tmx#Edificio1": {
+            "scaleInDock": 0.125
+        },
+        "Mapa_General.tmx#Edificio2": {
+            "scaleInDock": 0.125
+        },
+        "Mapa_General.tmx#auditorio": {
             "dynamicWrapping": false,
-            "scaleInDock": 0.5,
-            "scaleInEditor": 1
+            "scaleInDock": 1
+        },
+        "Mapa_General.tmx#cafeteria": {
+            "dynamicWrapping": true,
+            "scaleInDock": 0.5
+        },
+        "Mapa_General.tmx#palapas": {
+            "dynamicWrapping": false,
+            "scaleInDock": 0.25
+        },
+        "calles/calles.tsx": {
+            "dynamicWrapping": true,
+            "scaleInDock": 0.0625,
+            "scaleInEditor": 0.03125
         },
         "calles/construcciones/construcciones.tsx": {
             "dynamicWrapping": true,
@@ -35,6 +67,7 @@
             "scaleInEditor": 1
         }
     },
+    "last.externalTilesetPath": "D:/mayra/Documents/GitHub/EDU_Tycoon/assets/Mapa/calles",
     "last.imagePath": "C:/Users/kevin/Downloads/Mapa/Edificios",
     "map.height": 50,
     "map.lastUsedFormat": "tmx",
@@ -43,21 +76,18 @@
     "map.tileWidth": 64,
     "map.width": 50,
     "openFiles": [
-        "Mapa_General.tmx",
-        "calles/calles.tsx",
-        "calles/construcciones/construcciones.tsx",
-        "EdificioESCOM.tsx",
-        "Edificio1Mini.tsx"
+        "Mapa_General.tmx"
     ],
     "project": "Mundo.tiled-project",
     "recentFiles": [
         "Mapa_General.tmx",
         "calles/calles.tsx",
-        "calles/construcciones/construcciones.tsx",
         "EdificioESCOM.tsx",
-        "Edificio1Mini.tsx"
+        "Edificio1Mini.tsx",
+        "calles/construcciones/construcciones.tsx"
     ],
     "resizeMap.removeObjects": false,
+    "tileset.lastUsedFilter": "Archivos de conjuntos de patrones Tiled (*.tsx *.xml)",
     "tileset.lastUsedFormat": "tsx",
     "tileset.type": 1
 }
