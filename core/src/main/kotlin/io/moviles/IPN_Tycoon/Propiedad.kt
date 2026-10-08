@@ -62,9 +62,9 @@ object PropiedadRepository {
         // ── MAC AND CHEESE ────────────────────────────────────────────
         "Mac_and_cheese" to Propiedad(
             id            = "Mac_and_cheese",
-            nombre        = "Mac and Cheese",
+            nombre        = "Burgers & Fries",
             precio        = 120_000L,
-            descripcion   = "Puesto de comida rápida",
+            descripcion   = "Restaurante de comida rápida",
             capacidad     = 200,
             baseAlumnos   = 50,
             mejoraMax     = 2,
