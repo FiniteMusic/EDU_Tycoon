@@ -218,7 +218,18 @@ class GameScreen(game: Main) : BaseScreen(game, ExtendViewport(800f, 480f)) {
         if (buildingTextureCache.containsKey(key)) return buildingTextureCache[key]
 
         val exacto = Gdx.files.internal("Mapa/Edificios/$key.png")
-        val archivo = if (exacto.exists()) exacto else indicesPNG[clavePNG(key)]
+        val frontal = if (propiedad.id == "Biblioteca" && propiedad.nivel == 3)
+            Gdx.files.internal("Mapa/Edificios/Bibliotecalvl3_frente.png") else null
+        val archivo = if (frontal != null && frontal.exists()) frontal
+            else if (exacto.exists()) exacto
+            else indicesPNG[clavePNG(key)] ?: run {
+                val base = Gdx.files.internal("Mapa/Edificios/${prefix}lvl1.png")
+                if (propiedad.nivel > 1 && base.exists()) {
+                    Gdx.app.error("EDU_TILED_NIVELES", "Falta fachada N${propiedad.nivel} " +
+                        "para ${propiedad.id}: $key.png; provisionalmente se muestra N1")
+                    base
+                } else null
+            }
         val tex = try {
             if (archivo != null && archivo.exists()) {
                 Texture(archivo).apply {
@@ -261,27 +272,103 @@ class GameScreen(game: Main) : BaseScreen(game, ExtendViewport(800f, 480f)) {
     private var dialogoActor: DialogoActor? = null
     private var currentInfoWindow: BuildingInfoWindow? = null
 
-    // PASO2_INTERIORES: overlay ligero; no cambia de pantalla ni recarga el TMX.
+    // EDU_DISENO_UNIFICADO_V3: interior integrado, seguimiento de cámara y
+    // gestión disponible para edificios sin PNG de interior (p. ej. Palapas).
     private var interiorAbierto: InteriorOverlay? = null
+    private var camaraAnteriorInterior: Vector3? = null
+    private var zoomAnteriorInterior: Float? = null
+    private var zoomObjetivoInterior: Float? = null
 
+    private fun restaurarCamaraAnteriorInterior() {
+        camaraAnteriorInterior?.let { targetCameraPos.set(it) }
+        zoomAnteriorInterior?.let {
+            zoomObjetivoInterior = it
+            initialZoom = it
+        }
+        camaraAnteriorInterior = null
+        zoomAnteriorInterior = null
+    }
+
+    // EDU_FIX_INTERIORES_VISIBLES_V6: diagnóstico visible, sin cierre ni
+    // deshabilitar compras. Palapas nunca entra aquí desde la gestión.
+    private fun avisarInteriorNoDisponible(mensaje: String) {
+        try {
+            val aviso = com.kotcrab.vis.ui.widget.VisWindow("Interior no disponible")
+            aviso.addCloseButton()
+            val texto = com.kotcrab.vis.ui.widget.VisLabel(mensaje)
+            texto.setWrap(true)
+            aviso.add(texto).width(360f).pad(18f)
+            aviso.pack()
+            aviso.centerWindow()
+            stage.addActor(aviso)
+            aviso.toFront()
+        } catch (fallo: Throwable) {
+            Gdx.app.error("EDU_INTERIOR", "V6 no pudo mostrar el aviso: $mensaje", fallo)
+        }
+    }
+
+    // EDU_FIX_INTERIORES_ANCLAJE_V7: encuadre con margen para controles.
     private fun abrirInterior(propiedad: Propiedad) {
         if (!modoCarga || !propiedad.comprada || propiedad.nivel < 1) return
-        // Sin interior no se abre ninguna ventana (Palapas y recursos ausentes).
-        val ruta = InteriorAssets.buscar(propiedad) ?: return
-        if (!Gdx.files.internal(ruta).exists()) {
-            Gdx.app.error("EDU_INTERIOR", "Interior no disponible: $ruta")
+        val ruta = InteriorAssets.buscar(propiedad)
+        if (ruta == null || !Gdx.files.internal(ruta).exists()) {
+            Gdx.app.log("EDU_INTERIOR", "V4 sin PNG interior: id=${propiedad.id} nivel=${propiedad.nivel}")
+            // No desactivar la mejora: solo avisar del PNG faltante.
+            mostrarGestion(propiedad)
+            if (propiedad.interiorTexturePrefix != null) {
+                avisarInteriorNoDisponible(InteriorAssets.ultimoError ?: "Falta el PNG de nivel ${propiedad.nivel}.")
+            }
             return
         }
-        cerrarInterior()
+        val entry = renderEntries.firstOrNull { it.propiedad.id == propiedad.id }
+        if (entry == null) {
+            mostrarGestion(propiedad)
+            return
+        }
+        if (interiorAbierto != null) cerrarInterior()
+        val geometria = geometriaEdificio(entry)
+        val centroX = entry.bWorldX + geometria.desplazamientoX
+        val centroY = entry.bWorldY + geometria.desplazamientoY + geometria.alto * 0.5f
         val nuevo = InteriorOverlay(
-            stage, propiedad,
+            stage = stage,
+            propiedad = propiedad,
+            camera = camera,
+            edificioCentroX = centroX,
+            edificioCentroY = centroY,
+            edificioAnchoMundo = geometria.ancho,
+            edificioAltoMundo = geometria.alto,
+            rotacionExterior = geometria.rotacion ?: entry.bRotation,
+            reflejoExteriorX = geometria.reflejoX ?: entry.bFlipX,
+            reflejoExteriorY = geometria.reflejoY ?: entry.bFlipY,
             alAdministrar = { mostrarGestion(it) },
             alCerrar = {
                 objectLayerRenderer?.setInteriorFocus(null)
                 interiorAbierto = null
+                restaurarCamaraAnteriorInterior()
             }
         )
-        if (!nuevo.mostrar()) return
+        // EDU_FIX_INTERIORES_CRASH_V5: si falla cualquier recurso, conservar
+        // la pantalla de gestion, los niveles y la partida actual.
+        val interiorVisible = try {
+            nuevo.mostrar()
+        } catch (fallo: Throwable) {
+            Gdx.app.error("EDU_INTERIOR", "V5 fallo de apertura: ${propiedad.id} N${propiedad.nivel}", fallo)
+            false
+        }
+        if (!interiorVisible) {
+            Gdx.app.log("EDU_INTERIOR", "V6 apertura fallida; se conserva gestión")
+            mostrarGestion(propiedad)
+            avisarInteriorNoDisponible(InteriorAssets.ultimoError ?:
+                "Falló la creación del interior. Consulta Logcat con filtro EDU_INTERIOR.")
+            return
+        }
+        camaraAnteriorInterior = Vector3(targetCameraPos)
+        zoomAnteriorInterior = camera.zoom
+        targetCameraPos.set(centroX, centroY, 0f)
+        zoomObjetivoInterior = kotlin.math.max(
+            geometria.ancho / (camera.viewportWidth * 0.84f),
+            geometria.alto / (camera.viewportHeight * 0.73f)
+        ).coerceIn(1f, 14f)
         currentInfoWindow?.remove()
         currentInfoWindow = null
         interiorAbierto = nuevo
@@ -290,9 +377,7 @@ class GameScreen(game: Main) : BaseScreen(game, ExtendViewport(800f, 480f)) {
 
     private fun cerrarInterior(): Boolean {
         val actual = interiorAbierto ?: return false
-        objectLayerRenderer?.setInteriorFocus(null)
-        actual.cerrar()
-        interiorAbierto = null
+        actual.cerrar() // Su callback restaura cámara y opacidad.
         return true
     }
 
@@ -304,6 +389,11 @@ class GameScreen(game: Main) : BaseScreen(game, ExtendViewport(800f, 480f)) {
                 hudDirty = true
                 invalidateRenderEntry(propiedad.id)
                 Gdx.app.log("GAME", "${propiedad.nombre} → nivel ${propiedad.nivel}")
+                // Reabrir la ficha después de que BuildingInfoWindow retire
+                // la anterior. El siguiente nivel vuelve a estar disponible.
+                Gdx.app.postRunnable {
+                    if (modoCarga && interiorAbierto == null) mostrarGestion(propiedad)
+                }
             },
             onInteriorRequested = { abrirInterior(it) }
         )
@@ -581,6 +671,25 @@ class GameScreen(game: Main) : BaseScreen(game, ExtendViewport(800f, 480f)) {
                 currentInfoWindow = null
 
                 try {
+                    // Seleccion por la posicion VISUAL de mejoras movidas en Tiled.
+                    // Solo nivel >= 2; niveles 1 y desbloqueos mantienen las hitboxes.
+                    val edificioMovido = renderEntries.asReversed().firstOrNull { entry ->
+                        val propiedad = entry.propiedad
+                        if (!propiedad.comprada || propiedad.nivel < 2) false
+                        else {
+                            val geo = geometriaEdificio(entry)
+                            val centroX = entry.bWorldX + geo.desplazamientoX
+                            val abajo = entry.bWorldY + geo.desplazamientoY
+                            worldTouch.x >= centroX - geo.ancho * 0.38f &&
+                            worldTouch.x <= centroX + geo.ancho * 0.38f &&
+                            worldTouch.y >= abajo + geo.alto * 0.08f &&
+                            worldTouch.y <= abajo + geo.alto * 0.75f
+                        }
+                    }
+                    if (edificioMovido != null) {
+                        mostrarGestion(edificioMovido.propiedad)
+                        return true
+                    }
                     val logicaLayer = m.layers["Logica_Clics"] ?: return false
                     for (obj in logicaLayer.objects) {
                         if (obj !is RectangleMapObject || !obj.isVisible) continue
@@ -589,11 +698,10 @@ class GameScreen(game: Main) : BaseScreen(game, ExtendViewport(800f, 480f)) {
                             val propId    = puntosAPropiedad[rawName] ?: rawName
                             val propiedad = PropiedadRepository.getPropiedad(propId) ?: continue
 
-                            if (propiedad.comprada) {
-                                abrirInterior(propiedad)
-                            } else {
-                                mostrarGestion(propiedad)
-                            }
+                            // EDU_FIX_INTERIORES_GESTION_V4:
+                            // La gestión es la puerta de entrada universal.
+                            // Así ninguna textura faltante bloquea el N2/N3.
+                            mostrarGestion(propiedad)
                             return true
                         }
                     }
@@ -609,11 +717,8 @@ class GameScreen(game: Main) : BaseScreen(game, ExtendViewport(800f, 480f)) {
                         worldTouch.y >= consultorio.bWorldY &&
                         worldTouch.y <= consultorio.bWorldY + consultorio.bHeight * 0.60f) {
                         val prop = consultorio.propiedad
-                        if (prop.comprada) {
-                            abrirInterior(prop)
-                        } else {
-                            mostrarGestion(prop)
-                        }
+                        // Mismo comportamiento para Consultorio.
+                        mostrarGestion(prop)
                         Gdx.app.log("MAP_TOUCH", "Consultorio abierto desde área visual")
                         return true
                     }
@@ -636,6 +741,7 @@ class GameScreen(game: Main) : BaseScreen(game, ExtendViewport(800f, 480f)) {
 
             override fun zoom(initialDistance: Float, distance: Float): Boolean {
                 if (interiorAbierto != null) return true
+                zoomObjetivoInterior = null
                 val ratio = if (distance > 0) initialDistance / distance else 1f
                 camera.zoom = (initialZoom * ratio).coerceIn(1f, maxZoom)
                 limitarCamaraAlCampus()
@@ -690,22 +796,130 @@ class GameScreen(game: Main) : BaseScreen(game, ExtendViewport(800f, 480f)) {
     // EDU_PHASE1_SCALING: ajustes exclusivamente visuales; no modifican la economía.
     // Ajusta estos valores tras comprobar la separación con los caminos.
     // El nivel 1 siempre conserva las dimensiones originales de Tiled.
+    // EDU_DISENO_UNIFICADO_V3: dimensiones independientes X/Y para evitar
+    // deformar las texturas de niveles superiores y respetar la fachada.
+    // El nivel 1 mantiene exactamente la geometría de Tiled.
+    private data class GeometriaEdificio(
+        val ancho: Float,
+        val alto: Float,
+        val desplazamientoX: Float = 0f,
+        val desplazamientoY: Float = 0f,
+        val rotacion: Float? = null,
+        val reflejoX: Boolean? = null,
+        val reflejoY: Boolean? = null
+    )
+
     private fun factorEscalaVisual(id: String, nivel: Int): Float {
         if (nivel <= 1) return 1f
         return when (id) {
-            // Biblioteca Central: las ampliaciones ocupan más espacio en sus PNG.
             "Biblioteca" -> when (nivel) {
                 2 -> 0.87f
                 3 -> 0.78f
                 else -> 0.74f
             }
-            // Ajuste general conservador para evitar que las mejoras invadan calles.
             else -> when (nivel) {
                 2 -> 0.94f
                 3 -> 0.88f
                 else -> 0.84f
             }
         }
+    }
+
+    // EDU_EDITOR_NIVELES_TILED_V1 / EDU_GEOMETRIA_RELATIVA_V3: datos pequeños por nivel.
+    // Las capas EDU_NIVEL_* nunca se incluyen en Mapa_Android_Optimizado.tmx.
+    private data class NivelTiled(
+        val deltaMundoX: Float, val deltaMundoY: Float,
+        val ancho: Float, val alto: Float,
+        val rotacion: Float, val flipX: Boolean, val flipY: Boolean
+    )
+
+    private val posicionesNivelesTiled: Map<String, NivelTiled> by lazy {
+        val fichero = Gdx.files.internal("Mapa/ajustes_niveles_runtime.txt")
+        if (!fichero.exists() || !fichero.readString("UTF-8").startsWith("# EDU_GEOMETRIA_RELATIVA_V3")) {
+            Gdx.app.log("EDU_TILED_NIVELES", "Sin ajustes V3 relativos; geometría V7 segura")
+            emptyMap()
+        } else {
+            val datos = mutableMapOf<String, NivelTiled>()
+            try {
+                fichero.readString("UTF-8").lineSequence().forEach { linea ->
+                    val l = linea.trim()
+                    if (l.isBlank() || l.startsWith("#")) return@forEach
+                    val p = l.split('|')
+                    if (p.size != 9) return@forEach
+                    val nivel = p[1].toIntOrNull() ?: return@forEach
+                    val x = p[2].toFloatOrNull() ?: return@forEach
+                    val y = p[3].toFloatOrNull() ?: return@forEach
+                    val ancho = p[4].toFloatOrNull() ?: return@forEach
+                    val alto = p[5].toFloatOrNull() ?: return@forEach
+                    val rotacion = p[6].toFloatOrNull() ?: return@forEach
+                    if (nivel < 2 || !x.isFinite() || !y.isFinite() ||
+                        !ancho.isFinite() || !alto.isFinite() || !rotacion.isFinite() ||
+                        ancho <= 0f || alto <= 0f) return@forEach
+                    datos["${p[0]}|$nivel"] = NivelTiled(
+                        x, y, ancho, alto, rotacion,
+                        p[7].equals("true", ignoreCase = true),
+                        p[8].equals("true", ignoreCase = true)
+                    )
+                }
+            } catch (e: Exception) {
+                Gdx.app.error("EDU_TILED_NIVELES", "Datos de Tiled ilegibles; conservar V7", e)
+                datos.clear()
+            }
+            Gdx.app.log("EDU_TILED_NIVELES", "Ajustes visuales de nivel: ${datos.size}")
+            datos
+        }
+    }
+
+    private fun geometriaEdificio(entry: RenderEntry): GeometriaEdificio {
+        val id = entry.propiedad.id
+        val nivel = entry.propiedad.nivel
+        if (nivel > 1) {
+            // El editor visual tiene prioridad; si no hay ajuste conserva V7.
+            posicionesNivelesTiled["$id|$nivel"]?.let { ajuste ->
+                return GeometriaEdificio(
+                    ajuste.ancho, ajuste.alto,
+                    // El dato V3 es un DESPLAZAMIENTO respecto al nivel 1.
+                    // No restar de nuevo las coordenadas absolutas del anclaje.
+                    desplazamientoX = ajuste.deltaMundoX,
+                    desplazamientoY = ajuste.deltaMundoY,
+                    rotacion = ajuste.rotacion,
+                    reflejoX = ajuste.flipX,
+                    reflejoY = ajuste.flipY
+                )
+            }
+        }
+        if (nivel <= 1) return GeometriaEdificio(entry.bWidth, entry.bHeight)
+
+        val escala = factorEscalaVisual(id, nivel)
+        // Dirección N3: se aleja del mobiliario del borde izquierdo.
+        // Biblioteca N3: el hueco de fachada es más alto y menos ancho.
+        val limiteAncho = when {
+            id == "Direccion" && nivel >= 3 -> entry.bWidth * 0.72f
+            id == "Biblioteca" && nivel == 3 -> entry.bWidth * 0.70f
+            else -> entry.bWidth * escala
+        }
+        val limiteAlto = when {
+            id == "Direccion" && nivel >= 3 -> entry.bHeight * 0.82f
+            id == "Biblioteca" && nivel == 3 -> entry.bHeight * 1.04f
+            else -> entry.bHeight * escala
+        }
+        val desplazamiento = if (id == "Direccion" && nivel >= 3)
+            entry.bWidth * 0.065f else 0f
+
+        // No alterar las proporciones ya aprobadas de los otros 16 edificios.
+        if (id != "Direccion" && id != "Biblioteca") {
+            return GeometriaEdificio(limiteAncho, limiteAlto, desplazamiento)
+        }
+        val textura = entry.cachedTex
+        if (textura == null || textura.width <= 0 || textura.height <= 0) {
+            return GeometriaEdificio(limiteAncho, limiteAlto, desplazamiento)
+        }
+        // Ajuste de aspecto sin estirar: altura y anchura reales del PNG del
+        // nivel actual, no la caja fija del nivel 1.
+        val aspecto = textura.width.toFloat() / textura.height.toFloat()
+        val ancho = kotlin.math.min(limiteAncho, limiteAlto * aspecto)
+        val alto = ancho / aspecto
+        return GeometriaEdificio(ancho, alto, desplazamiento)
     }
 
     private fun sincronizarEdificiosComprados() {
@@ -753,17 +967,17 @@ class GameScreen(game: Main) : BaseScreen(game, ExtendViewport(800f, 480f)) {
                 else -> entry.bSortIndex
             }
             // Ajustar exclusivamente tamaño visual de mejoras, conservando centro inferior.
-            val escalaVisual = factorEscalaVisual(entry.propiedad.id, entry.propiedad.nivel)
+            val geometria = geometriaEdificio(entry)
             purchased.add(IsometricObjectLayerRenderer.PurchasedSprite(
                 id = entry.propiedad.id,
                 texture = texture,
-                worldX = entry.bWorldX,
-                worldY = entry.bWorldY,
-                width = entry.bWidth * escalaVisual,
-                height = entry.bHeight * escalaVisual,
-                rotation = entry.bRotation,
-                flipX = entry.bFlipX,
-                flipY = entry.bFlipY,
+                worldX = entry.bWorldX + geometria.desplazamientoX,
+                worldY = entry.bWorldY + geometria.desplazamientoY,
+                width = geometria.ancho,
+                height = geometria.alto,
+                rotation = geometria.rotacion ?: entry.bRotation,
+                flipX = geometria.reflejoX ?: entry.bFlipX,
+                flipY = geometria.reflejoY ?: entry.bFlipY,
                 sortY = sortY,
                 sortIndex = sortIndex
             ))
@@ -985,6 +1199,7 @@ class GameScreen(game: Main) : BaseScreen(game, ExtendViewport(800f, 480f)) {
                 tiempoDiagnosticoFPS = 0f
             }
         }
+        interiorAbierto?.actualizarPosicion()
         stage.act(delta)
         stage.draw()
     }
@@ -1018,12 +1233,18 @@ class GameScreen(game: Main) : BaseScreen(game, ExtendViewport(800f, 480f)) {
     }
 
     private fun actualizarCamara(delta: Float) {
-        limitarCamaraAlCampus()
-        val alpha = 1f - kotlin.math.exp(-12f * delta.coerceIn(0f, 0.05f))
+        if (interiorAbierto == null && zoomObjetivoInterior == null) limitarCamaraAlCampus()
+        val alpha = 1f - kotlin.math.exp(-10f * delta.coerceIn(0f, 0.05f))
         camera.position.lerp(targetCameraPos, alpha)
+        zoomObjetivoInterior?.let { objetivo ->
+            camera.zoom += (objetivo - camera.zoom) * alpha
+            if (kotlin.math.abs(camera.zoom - objetivo) < 0.005f) {
+                camera.zoom = objetivo
+                zoomObjetivoInterior = null
+            }
+        }
         camera.update()
         renderer?.setView(camera)
-        // OPTIMIZACIÓN: Actualizar el rect de culling 2D una vez por frame
         updateScreenRect()
     }
 
@@ -1216,6 +1437,7 @@ class GameScreen(game: Main) : BaseScreen(game, ExtendViewport(800f, 480f)) {
         camera.viewportHeight = virtualHeight
         camera.viewportWidth = virtualHeight * width.coerceAtLeast(1).toFloat() / height.coerceAtLeast(1).toFloat()
         camera.update()
+        interiorAbierto?.actualizarPosicion()
     }
 
     override fun dispose() {
