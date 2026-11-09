@@ -1,5 +1,6 @@
 package io.moviles.IPN_Tycoon
 
+import io.moviles.IPN_Tycoon.rendering.IsometricObjectLayerRenderer
 import com.badlogic.gdx.Gdx
 import com.badlogic.gdx.Input
 import com.badlogic.gdx.InputMultiplexer
@@ -29,6 +30,7 @@ import com.badlogic.gdx.scenes.scene2d.ui.Table
 import com.badlogic.gdx.scenes.scene2d.utils.ClickListener
 import com.badlogic.gdx.utils.Align
 import com.badlogic.gdx.utils.Scaling
+import com.badlogic.gdx.utils.viewport.ExtendViewport
 import com.badlogic.gdx.scenes.scene2d.actions.Actions
 import io.moviles.IPN_Tycoon.engine.EconomyEngine
 import io.moviles.IPN_Tycoon.engine.EstudiantesEngine
@@ -41,7 +43,18 @@ import ktx.app.clearScreen
 import ktx.assets.toInternalFile
 import ktx.scene2d.*
 
-class GameScreen(game: Main) : BaseScreen(game) {
+class GameScreen(game: Main) : BaseScreen(game, ExtendViewport(800f, 480f)) {
+
+    private var tiempoDiagnosticoFPS = 0f
+
+    // El TMX de Android NO contiene las 250,000 celdas de Fondo_pasto.
+    // Se dibuja un fondo verde texturizado con una sola llamada a GPU.
+    private val pastoDetallado = false
+    private var fondoPastoRapido: Texture? = null
+    private var fondoPastoIntentado = false
+    private var camaraCentradaEnCampus = false
+
+    private val objectLayerRenderer by lazy { map?.let { IsometricObjectLayerRenderer(it) } }
 
     // ── Motor de ciclos ───────────────────────────────────────────────
     private val cycleEngine       = GameCycleEngine()
@@ -53,6 +66,9 @@ class GameScreen(game: Main) : BaseScreen(game) {
 
     // ── Ajustes de Optimización ──────────────────────────────────────
     private val maxZoom                = 7.0f
+    private val virtualHeight = 480f
+    private val initialCameraX = -436f
+    private val initialCameraY = 1360f
     private val maxZoomForLabels       = 4.0f
     private val maxZoomForFullBuildings = 5.8f
 
@@ -71,14 +87,51 @@ class GameScreen(game: Main) : BaseScreen(game) {
     }
 
     // ── Mapa ──────────────────────────────────────────────────────────
+
     private val map: TiledMap? by lazy {
+        val ruta = "Mapa/Mapa_Android_Optimizado.tmx"
+
         try {
-            TmxMapLoader().load("Mapa/Mapa_General.tmx")
+            val archivo = Gdx.files.internal(ruta)
+
+            Gdx.app.log(
+                "MAP_DEBUG",
+                "Existe el archivo TMX: ${archivo.exists()}"
+            )
+
+            val mapaCargado = TmxMapLoader().load(ruta)
+
+            Gdx.app.log(
+                "MAP_DEBUG",
+                "MAPA CARGADO CORRECTAMENTE"
+            )
+
+            Gdx.app.log(
+                "MAP_DEBUG",
+                "Numero de capas: ${mapaCargado.layers.count}"
+            )
+
+            for (i in 0 until mapaCargado.layers.count) {
+                val capa = mapaCargado.layers[i]
+
+                Gdx.app.log(
+                    "MAP_DEBUG",
+                    "Capa: ${capa.name} - Visible: ${capa.isVisible}"
+                )
+            }
+
+            mapaCargado
+
         } catch (e: Exception) {
-            Gdx.app.error("MAP_ERROR", "Error cargando mapa: ${e.message}")
+            Gdx.app.error(
+                "MAP_DEBUG",
+                "ERROR AL CARGAR EL MAPA",
+                e
+            )
             null
         }
     }
+
     private val renderer: IsometricTiledMapRenderer? by lazy {
         map?.let { IsometricTiledMapRenderer(it) }
     }
@@ -86,7 +139,7 @@ class GameScreen(game: Main) : BaseScreen(game) {
     private val layerIndicesToRender: IntArray by lazy {
         val m = map ?: return@lazy intArrayOf()
         (0 until m.layers.count)
-            .filter { m.layers[it].name != "Edificios" }
+            .filter { m.layers[it] is com.badlogic.gdx.maps.tiled.TiledMapTileLayer }
             .toIntArray()
     }
 
@@ -138,25 +191,54 @@ class GameScreen(game: Main) : BaseScreen(game) {
 
     // ── Caché de texturas de edificios ────────────────────────────────
     private val buildingTextureCache = mutableMapOf<String, Texture?>()
+    private val missingBuildingTextures = mutableSetOf<String>()
 
     // OPTIMIZACIÓN: Pre-resolvemos la textura en BuildingRenderInfo para
     // no llamar a getBuildingTexture() cada frame (evita hashmap lookup + lambda)
+    // Índice de los archivos reales de Android assets: se crea una sola vez.
+    // Android distingue mayúsculas/minúsculas, a diferencia de Windows.
+    private fun clavePNG(valor: String): String =
+        java.text.Normalizer.normalize(valor, java.text.Normalizer.Form.NFD)
+            .replace(Regex("\\p{M}+"), "")
+            .lowercase(java.util.Locale.ROOT)
+            .replace(Regex("[^a-z0-9]"), "")
+
+    private val indicesPNG: Map<String, com.badlogic.gdx.files.FileHandle> by lazy {
+        val carpeta = Gdx.files.internal("Mapa/Edificios")
+        val archivos = carpeta.list().filter {
+            it.extension().equals("png", ignoreCase = true)
+        }
+        Gdx.app.log("TEXTURE", "PNG de edificios detectados en assets: ${archivos.size}")
+        archivos.associateBy { clavePNG(it.nameWithoutExtension()) }
+    }
+
     private fun getBuildingTexture(propiedad: Propiedad): Texture? {
         val prefix = propiedad.texturePrefix ?: return null
-        val key    = "${prefix}lvl${propiedad.nivel}"
-        // getOrPut con valor ya computado evita la lambda en cache hit
-        val cached = buildingTextureCache[key]
-        if (cached != null) return cached
-        val file = "Mapa/Edificios/$key.png".toInternalFile()
-        val tex = if (file.exists()) Texture(file) else null
-        if (tex == null) Gdx.app.error("TEXTURE", "No encontrado: $key.png")
+        val key = "${prefix}lvl${propiedad.nivel}"
+        if (buildingTextureCache.containsKey(key)) return buildingTextureCache[key]
+
+        val exacto = Gdx.files.internal("Mapa/Edificios/$key.png")
+        val archivo = if (exacto.exists()) exacto else indicesPNG[clavePNG(key)]
+        val tex = try {
+            if (archivo != null && archivo.exists()) {
+                Texture(archivo).apply {
+                    setFilter(Texture.TextureFilter.Linear, Texture.TextureFilter.Linear)
+                }
+            } else null
+        } catch (e: Exception) {
+            Gdx.app.error("TEXTURE", "No se pudo abrir el PNG de ${propiedad.id}", e)
+            null
+        }
+        if (tex == null && missingBuildingTextures.add(key)) {
+            Gdx.app.error("TEXTURE", "FALTA el PNG para ${propiedad.id}: $key.png " +
+                "(nivel ${propiedad.nivel}); comprueba assets/Mapa/Edificios")
+        }
         buildingTextureCache[key] = tex
         return tex
     }
 
     private val worldFont: BitmapFont by lazy {
         val skinFont = Scene2DSkin.defaultSkin.getFont("default-font")
-        skinFont.data.setScale(1.0f)
         val fontData = com.badlogic.gdx.graphics.g2d.BitmapFont.BitmapFontData(
             skinFont.data.fontFile,
             skinFont.data.flipped
@@ -178,6 +260,56 @@ class GameScreen(game: Main) : BaseScreen(game) {
     // ── Diálogo ───────────────────────────────────────────────────────
     private var dialogoActor: DialogoActor? = null
     private var currentInfoWindow: BuildingInfoWindow? = null
+
+    // PASO2_INTERIORES: overlay ligero; no cambia de pantalla ni recarga el TMX.
+    private var interiorAbierto: InteriorOverlay? = null
+
+    private fun abrirInterior(propiedad: Propiedad) {
+        if (!modoCarga || !propiedad.comprada || propiedad.nivel < 1) return
+        // Sin interior no se abre ninguna ventana (Palapas y recursos ausentes).
+        val ruta = InteriorAssets.buscar(propiedad) ?: return
+        if (!Gdx.files.internal(ruta).exists()) {
+            Gdx.app.error("EDU_INTERIOR", "Interior no disponible: $ruta")
+            return
+        }
+        cerrarInterior()
+        val nuevo = InteriorOverlay(
+            stage, propiedad,
+            alAdministrar = { mostrarGestion(it) },
+            alCerrar = {
+                objectLayerRenderer?.setInteriorFocus(null)
+                interiorAbierto = null
+            }
+        )
+        if (!nuevo.mostrar()) return
+        currentInfoWindow?.remove()
+        currentInfoWindow = null
+        interiorAbierto = nuevo
+        objectLayerRenderer?.setInteriorFocus(propiedad.id)
+    }
+
+    private fun cerrarInterior(): Boolean {
+        val actual = interiorAbierto ?: return false
+        objectLayerRenderer?.setInteriorFocus(null)
+        actual.cerrar()
+        interiorAbierto = null
+        return true
+    }
+
+    private fun mostrarGestion(propiedad: Propiedad) {
+        currentInfoWindow?.remove()
+        currentInfoWindow = BuildingInfoWindow(
+            propiedad,
+            onBuildingChanged = {
+                hudDirty = true
+                invalidateRenderEntry(propiedad.id)
+                Gdx.app.log("GAME", "${propiedad.nombre} → nivel ${propiedad.nivel}")
+            },
+            onInteriorRequested = { abrirInterior(it) }
+        )
+        currentInfoWindow?.show(stage)
+    }
+
     private val backgroundTexture: Texture by lazy {
         Texture("background.png".toInternalFile()).apply {
             setFilter(Texture.TextureFilter.Linear, Texture.TextureFilter.Linear)
@@ -214,7 +346,7 @@ class GameScreen(game: Main) : BaseScreen(game) {
         val pixmap = Pixmap(64, 64, Pixmap.Format.RGBA8888)
         pixmap.setColor(Color(1f, 1f, 1f, 1f))
         pixmap.fillCircle(32, 32, 30)
-        Texture(pixmap).apply { setFilter(Texture.TextureFilter.Linear, Texture.TextureFilter.Linear) }
+        Texture(pixmap).apply { setFilter(Texture.TextureFilter.Linear, Texture.TextureFilter.Linear) }.also { pixmap.dispose() }
     }
 
     // ── OPTIMIZACIÓN: Datos de renderizado pre-calculados ─────────────
@@ -229,7 +361,14 @@ class GameScreen(game: Main) : BaseScreen(game) {
         // Coordenadas del Edificio (Building)
         val bWorldX:     Float,
         val bWorldY:     Float,
-        val bDrawX:      Float,   // bWorldX - renderW/2
+        val bDrawX:      Float,   // Anclaje izquierdo del sprite
+        val bWidth:      Float,   // Dimensiones visuales definidas en Tiled
+        val bHeight:     Float,
+        val bRotation:   Float,   // Rotación aplicada por el renderizador de objetos
+        val bFlipX:      Boolean,
+        val bFlipY:      Boolean,
+        val bSortY:      Float,
+        val bSortIndex:  Int,
         // Coordenadas de la Etiqueta (Label)
         val lWorldX:     Float,
         val lWorldY:     Float,
@@ -282,16 +421,36 @@ class GameScreen(game: Main) : BaseScreen(game) {
         "Turismo"        to "Turismo",
         "turismo"        to "Turismo",
         "Palapas"        to "palapas",
-        "palapas"        to "palapas"
+        "palapas"        to "palapas",
+        "Computo" to "escom_hitbox",
+        "Restaurante" to "cafeteria",
+        "Comida" to "Mac_and_cheese",
+        "comida" to "Mac_and_cheese",
+        "medicina" to "Edificio1",
+        "Medicina" to "Edificio1",
+        "Consultorio" to "Edificio2",
+        "Biblioteca" to "Biblioteca",
+        "Dormitorios" to "Dormitorios",
+        "Gastronomia" to "Gastronomia",
+        "Arte_Diseño_Deporte" to "Arte_diseno_deporte",
+        "Arte_diseño_deporte" to "Arte_diseno_deporte",
+        "arte_diseño_deporte" to "Arte_diseno_deporte",
+        "Arte_diseno_deporte" to "Arte_diseno_deporte",
     )
 
     // ─────────────────────────────────────────────────────────────────
     override fun show() {
         super.show()
+        cerrarInterior()
+        // Sólo Android DEBUG: omitir introducción/tutorial y abrir el mapa.
+        if (game.modoPruebasAndroid) {
+            modoCarga = true
+            tutorialHighlightPos = null
+        }
         val skin   = Scene2DSkin.defaultSkin
         val fuente = skin.getFont("default-font")
 
-        buildingTextureCache.clear()
+        // No vaciar caché aquí: las texturas son propiedad de esta pantalla.
 
         if (dialogoActor == null) {
             dialogoActor = DialogoActor(fuente) { path ->
@@ -312,6 +471,7 @@ class GameScreen(game: Main) : BaseScreen(game) {
         stage.addListener(object : InputListener() {
             override fun keyDown(event: InputEvent?, keycode: Int): Boolean {
                 if (keycode == Input.Keys.BACK || keycode == Input.Keys.ESCAPE) {
+                    if (cerrarInterior()) return true
                     if (!modoCarga && dialogoActor?.isVisible == true) {
                         if (!(dialogoActor?.retroceder() ?: false)) game.setScreen<SeleccionPartida>()
                         return true
@@ -382,6 +542,7 @@ class GameScreen(game: Main) : BaseScreen(game) {
         stage.addListener(object : InputListener() {
             override fun keyDown(event: InputEvent?, keycode: Int): Boolean {
                 if (keycode == Input.Keys.BACK || keycode == Input.Keys.ESCAPE) {
+                    if (cerrarInterior()) return true
                     game.setScreen<SeleccionPartida>()
                     return true
                 }
@@ -399,19 +560,20 @@ class GameScreen(game: Main) : BaseScreen(game) {
         hudDirty       = true
 
         val multiplexer = InputMultiplexer()
+        // Los controles de Scene2D tienen prioridad sobre los gestos del mapa.
         multiplexer.addProcessor(stage)
 
         val gestureDetector = GestureDetector(object : GestureAdapter() {
 
             override fun tap(x: Float, y: Float, count: Int, button: Int): Boolean {
+                if (interiorAbierto != null) return true
                 val m = map ?: return false
                 val worldTouch = Vector3(x, y, 0f)
                 camera.unproject(worldTouch)
 
-                val tileWidth  = 64f
-                val tileHeight = 32f
-                val tiledX = (worldTouch.x / (tileWidth  / 2f) - worldTouch.y / (tileHeight / 2f)) / 2f * tileHeight
-                val tiledY = (worldTouch.y / (tileHeight / 2f) + worldTouch.x / (tileWidth  / 2f)) / 2f * tileHeight
+                // Inversa exacta de wx=x+y, wy=(y-x)*0.5 usada en el render.
+                val tiledX = worldTouch.x * 0.5f - worldTouch.y
+                val tiledY = worldTouch.x * 0.5f + worldTouch.y
 
                 // Al tocar el mapa, cerramos cualquier ficha que esté abierta.
                 // Si tocamos una estructura, se abrirá la nueva abajo.
@@ -420,34 +582,63 @@ class GameScreen(game: Main) : BaseScreen(game) {
 
                 try {
                     val logicaLayer = m.layers["Logica_Clics"] ?: return false
-                    logicaLayer.objects.filterIsInstance<RectangleMapObject>().forEach { obj ->
+                    for (obj in logicaLayer.objects) {
+                        if (obj !is RectangleMapObject || !obj.isVisible) continue
                         if (obj.rectangle.contains(tiledX, tiledY)) {
                             val rawName   = obj.name ?: ""
                             val propId    = puntosAPropiedad[rawName] ?: rawName
-                            val propiedad = PropiedadRepository.getPropiedad(propId) ?: return false
+                            val propiedad = PropiedadRepository.getPropiedad(propId) ?: continue
 
-                            currentInfoWindow = BuildingInfoWindow(propiedad) {
-                                // Invalidar HUD y refrescar la textura cacheada del entry
-                                hudDirty = true
-                                invalidateRenderEntry(propId)
-                                Gdx.app.log("GAME", "${propiedad.nombre} → nivel ${propiedad.nivel}")
+                            if (propiedad.comprada) {
+                                abrirInterior(propiedad)
+                            } else {
+                                mostrarGestion(propiedad)
                             }
-                            currentInfoWindow?.show(stage)
                             return true
                         }
                     }
-                } catch (_: Exception) {}
+                    // Fallback táctil de Consultorios: la hitbox original
+                    // cubre solo una parte del sprite según el TMX recibido.
+                    // Se usa únicamente si ninguna hitbox tradicional coincidió.
+                    val consultorio = renderEntries.firstOrNull {
+                        it.propiedad.id == "Edificio2"
+                    }
+                    if (consultorio != null &&
+                        worldTouch.x >= consultorio.bWorldX - consultorio.bWidth * 0.44f &&
+                        worldTouch.x <= consultorio.bWorldX + consultorio.bWidth * 0.44f &&
+                        worldTouch.y >= consultorio.bWorldY &&
+                        worldTouch.y <= consultorio.bWorldY + consultorio.bHeight * 0.60f) {
+                        val prop = consultorio.propiedad
+                        if (prop.comprada) {
+                            abrirInterior(prop)
+                        } else {
+                            mostrarGestion(prop)
+                        }
+                        Gdx.app.log("MAP_TOUCH", "Consultorio abierto desde área visual")
+                        return true
+                    }
+                } catch (e: Exception) {
+                    Gdx.app.error("MAP_TOUCH", "Error procesando toque", e)
+                }
                 return false
             }
 
             override fun pan(x: Float, y: Float, deltaX: Float, deltaY: Float): Boolean {
-                targetCameraPos.add(-deltaX * camera.zoom, deltaY * camera.zoom, 0f)
+                if (interiorAbierto != null) return true
+                // Mover inmediatamente durante el arrastre: evita retraso acumulado.
+                val unitsX = camera.viewportWidth * camera.zoom / Gdx.graphics.width.coerceAtLeast(1)
+                val unitsY = camera.viewportHeight * camera.zoom / Gdx.graphics.height.coerceAtLeast(1)
+                targetCameraPos.add(-deltaX * unitsX, deltaY * unitsY, 0f)
+                limitarCamaraAlCampus()
+                camera.position.set(targetCameraPos)
                 return true
             }
 
             override fun zoom(initialDistance: Float, distance: Float): Boolean {
+                if (interiorAbierto != null) return true
                 val ratio = if (distance > 0) initialDistance / distance else 1f
                 camera.zoom = (initialZoom * ratio).coerceIn(1f, maxZoom)
+                limitarCamaraAlCampus()
                 return true
             }
 
@@ -458,6 +649,15 @@ class GameScreen(game: Main) : BaseScreen(game) {
         Gdx.input.inputProcessor = multiplexer
 
         prepararRenderEntries()
+        if (!camaraCentradaEnCampus) {
+            val centro = getBuildingPos("Biblioteca") ?: getBuildingPos("escom_hitbox")
+            if (centro != null) {
+                targetCameraPos.set(centro)
+                camera.position.set(centro)
+                camera.update()
+            }
+            camaraCentradaEnCampus = true
+        }
         setupHUD()
     }
 
@@ -466,9 +666,110 @@ class GameScreen(game: Main) : BaseScreen(game) {
      * Así no tenemos que regenerar toda la lista.
      */
     private fun invalidateRenderEntry(propId: String) {
-        renderEntries.find { it.propiedad.id == propId }?.let { entry ->
-            entry.cachedTex = getBuildingTexture(entry.propiedad)
+        val entry = renderEntries.find { it.propiedad.id == propId }
+        if (entry == null) {
+            Gdx.app.error("EDU_BUILD", "COMPRA SIN REGISTRO DE RENDER: id=$propId")
+        } else {
+            entry.cachedTex = if (entry.propiedad.comprada) getBuildingTexture(entry.propiedad) else null
+            if (entry.propiedad.comprada) {
+                if (entry.cachedTex == null) {
+                    Gdx.app.error("EDU_BUILD", "COMPRA SIN TEXTURA: id=$propId, nivel=${entry.propiedad.nivel}, prefix=${entry.propiedad.texturePrefix}")
+                } else {
+                    Gdx.app.log("EDU_BUILD", "COMPRA VISUAL: id=$propId, nivel=${entry.propiedad.nivel}, posicion=(${entry.bWorldX},${entry.bWorldY}), tamaño=(${entry.bWidth},${entry.bHeight})")
+                }
+            }
         }
+        sincronizarEdificiosComprados()
+    }
+
+    /** Inserta los comprados en la capa Edificios y en su orden real de Tiled. */
+    /** Intercala los comprados en Edificios, respetando la profundidad de Tiled.
+     * Medicina debe dibujarse DETRÁS de Consultorios, incluso si Tiled les dio
+     * coordenadas Y de orden opuesto (no mover las posiciones visuales).
+     */
+    // EDU_PHASE1_SCALING: ajustes exclusivamente visuales; no modifican la economía.
+    // Ajusta estos valores tras comprobar la separación con los caminos.
+    // El nivel 1 siempre conserva las dimensiones originales de Tiled.
+    private fun factorEscalaVisual(id: String, nivel: Int): Float {
+        if (nivel <= 1) return 1f
+        return when (id) {
+            // Biblioteca Central: las ampliaciones ocupan más espacio en sus PNG.
+            "Biblioteca" -> when (nivel) {
+                2 -> 0.87f
+                3 -> 0.78f
+                else -> 0.74f
+            }
+            // Ajuste general conservador para evitar que las mejoras invadan calles.
+            else -> when (nivel) {
+                2 -> 0.94f
+                3 -> 0.88f
+                else -> 0.84f
+            }
+        }
+    }
+
+    private fun sincronizarEdificiosComprados() {
+        val medicina = renderEntries.firstOrNull { it.propiedad.id == "Edificio1" }
+        val consultorio = renderEntries.firstOrNull { it.propiedad.id == "Edificio2" }
+        val menorOrdenY = if (medicina != null && consultorio != null)
+            kotlin.math.min(medicina.bSortY, consultorio.bSortY) else null
+        val mayorOrdenY = if (medicina != null && consultorio != null)
+            kotlin.math.max(medicina.bSortY, consultorio.bSortY) else null
+        val menorIndice = if (medicina != null && consultorio != null)
+            kotlin.math.min(medicina.bSortIndex, consultorio.bSortIndex) else null
+        val mayorIndice = if (medicina != null && consultorio != null)
+            kotlin.math.max(medicina.bSortIndex, consultorio.bSortIndex) else null
+
+        // Gastronomía debe quedar DETRÁS del Restaurante cuando ambos existen.
+        // Se fuerzan tanto la coordenada de profundidad como el índice para
+        // respetar los modos topdown e index del TMX.
+        val gastronomia = renderEntries.firstOrNull { it.propiedad.id == "Gastronomia" }
+        val restaurante = renderEntries.firstOrNull { it.propiedad.id == "cafeteria" }
+        val gastroAntesY = if (gastronomia != null && restaurante != null)
+            kotlin.math.min(gastronomia.bSortY, restaurante.bSortY) - 1f else null
+        val restauranteDespuesY = if (gastronomia != null && restaurante != null)
+            kotlin.math.max(gastronomia.bSortY, restaurante.bSortY) + 1f else null
+        val gastroAntesIndice = if (gastronomia != null && restaurante != null)
+            kotlin.math.min(gastronomia.bSortIndex, restaurante.bSortIndex) - 1 else null
+        val restauranteDespuesIndice = if (gastronomia != null && restaurante != null)
+            kotlin.math.max(gastronomia.bSortIndex, restaurante.bSortIndex) + 1 else null
+
+        val purchased = ArrayList<IsometricObjectLayerRenderer.PurchasedSprite>()
+        for (entry in renderEntries) {
+            if (!entry.propiedad.comprada) continue
+            val texture = entry.cachedTex ?: continue
+            val sortY = when (entry.propiedad.id) {
+                "Edificio1" -> menorOrdenY ?: entry.bSortY
+                "Edificio2" -> mayorOrdenY ?: entry.bSortY
+                "Gastronomia" -> gastroAntesY ?: entry.bSortY
+                "cafeteria" -> restauranteDespuesY ?: entry.bSortY
+                else -> entry.bSortY
+            }
+            val sortIndex = when (entry.propiedad.id) {
+                "Edificio1" -> menorIndice ?: entry.bSortIndex
+                "Edificio2" -> mayorIndice ?: entry.bSortIndex
+                "Gastronomia" -> gastroAntesIndice ?: entry.bSortIndex
+                "cafeteria" -> restauranteDespuesIndice ?: entry.bSortIndex
+                else -> entry.bSortIndex
+            }
+            // Ajustar exclusivamente tamaño visual de mejoras, conservando centro inferior.
+            val escalaVisual = factorEscalaVisual(entry.propiedad.id, entry.propiedad.nivel)
+            purchased.add(IsometricObjectLayerRenderer.PurchasedSprite(
+                id = entry.propiedad.id,
+                texture = texture,
+                worldX = entry.bWorldX,
+                worldY = entry.bWorldY,
+                width = entry.bWidth * escalaVisual,
+                height = entry.bHeight * escalaVisual,
+                rotation = entry.bRotation,
+                flipX = entry.bFlipX,
+                flipY = entry.bFlipY,
+                sortY = sortY,
+                sortIndex = sortIndex
+            ))
+        }
+        objectLayerRenderer?.setPurchasedSprites(purchased)
+        Gdx.app.log("EDU_BUILD", "Sprites comprados en escena: ${purchased.size}")
     }
 
     /**
@@ -478,54 +779,94 @@ class GameScreen(game: Main) : BaseScreen(game) {
      */
     private fun prepararRenderEntries() {
         renderEntries.clear()
+        val m = map ?: return
 
-        val edificiosLayer = map?.layers?.get("Puntos_origen") ?: return
-        val nombresLayer   = map?.layers?.get("Puntos_Nombres")
-
-        // Construir mapa de posiciones de etiquetas indexado por nombre
-        val nombresPorId = mutableMapOf<String, Pair<Float, Float>>()
-        nombresLayer?.objects?.filterIsInstance<PointMapObject>()?.forEach { obj ->
-            val rawName = obj.name ?: ""
-            val propId  = puntosAPropiedad[rawName] ?: rawName
-            val wx = obj.point.x + obj.point.y
-            val wy = (obj.point.y - obj.point.x) * 0.5f
-            nombresPorId[propId] = Pair(wx, wy)
+        fun idCanonico(nombre: String?): String {
+            val raw = nombre ?: ""
+            return puntosAPropiedad[raw] ?: raw
         }
 
-        // Una sola pasada para edificios — también une info de etiqueta si existe
-        edificiosLayer.objects.filterIsInstance<PointMapObject>().forEach { obj ->
-            val rawName   = obj.name ?: ""
-            val propId    = puntosAPropiedad[rawName] ?: rawName
-            val propiedad = PropiedadRepository.getPropiedad(propId) ?: return@forEach
+        val origenPorId = HashMap<String, PointMapObject>()
+        m.layers.get("Puntos_origen")?.objects
+            ?.filterIsInstance<PointMapObject>()?.forEach { obj ->
+                origenPorId[idCanonico(obj.name)] = obj
+            }
 
-            val buildingWorldX = obj.point.x + obj.point.y
-            val buildingWorldY = (obj.point.y - obj.point.x) * 0.5f
+        val anclajePorId = HashMap<String, PointMapObject>()
+        m.layers.get("Puntos_Render_Edificios")?.objects
+            ?.filterIsInstance<PointMapObject>()?.forEach { obj ->
+                anclajePorId[idCanonico(obj.name)] = obj
+            }
 
-            // Datos de la etiqueta flotante (si hay punto de nombre asociado)
-            val (labelWorldX, labelWorldY) = nombresPorId[propId] ?: Pair(buildingWorldX, buildingWorldY)
-            val texto   = "Edificio de ${propiedad.nombre}"
-            val layout  = GlyphLayout(worldFont, texto)
-            val padX    = 40f; val padY = 20f
-            val bgW     = layout.width  + padX * 2f
-            val bgH     = layout.height + padY * 2f
+        val nombrePorId = HashMap<String, PointMapObject>()
+        m.layers.get("Puntos_Nombres")?.objects
+            ?.filterIsInstance<PointMapObject>()?.forEach { obj ->
+                nombrePorId[idCanonico(obj.name)] = obj
+            }
+
+        var registrados = 0
+        var sinAnclaje = 0
+        for (propiedad in PropiedadRepository.propiedades.values) {
+            val id = propiedad.id
+            val anchor = anclajePorId[id]
+            val origen = origenPorId[id]
+            val etiqueta = nombrePorId[id]
+            val posicion = anchor?.point ?: origen?.point ?: etiqueta?.point
+
+            if (posicion == null) {
+                Gdx.app.error("EDU_BUILD", "SIN POSICIÓN: id=$id. Revisa Puntos_Render_Edificios/Puntos_origen/Puntos_Nombres")
+                continue
+            }
+            if (anchor == null) {
+                sinAnclaje++
+                Gdx.app.error("EDU_BUILD", "SIN ANCLAJE VISUAL: id=$id. Se emplea punto de origen o etiqueta; regenerar TMX optimizado para posición exacta")
+            }
+
+            val wx = posicion.x + posicion.y
+            val wy = (posicion.y - posicion.x) * 0.5f
+            val w = ((anchor?.properties?.get("renderW") as? Number)?.toFloat()
+                ?: propiedad.renderW).coerceAtLeast(1f)
+            val h = ((anchor?.properties?.get("renderH") as? Number)?.toFloat()
+                ?: propiedad.renderH).coerceAtLeast(1f)
+            val rot = (anchor?.properties?.get("renderRotation") as? Number)?.toFloat() ?: 0f
+            val flipX = anchor?.properties?.get("renderFlipX") == true
+            val flipY = anchor?.properties?.get("renderFlipY") == true
+            val sortY = (anchor?.properties?.get("renderSortY") as? Number)?.toFloat() ?: 0f
+            val sortIndex = (anchor?.properties?.get("renderSortIndex") as? Number)?.toInt() ?: 0
+
+            val nombrePoint = etiqueta?.point ?: posicion
+            val labelX = nombrePoint.x + nombrePoint.y
+            val labelY = (nombrePoint.y - nombrePoint.x) * 0.5f
+            val layout = GlyphLayout(worldFont, "Edificio de ${propiedad.nombre}")
+            val bgW = layout.width + 80f
+            val bgH = layout.height + 40f
 
             renderEntries.add(RenderEntry(
-                propiedad  = propiedad,
-                bWorldX    = buildingWorldX,
-                bWorldY    = buildingWorldY,
-                bDrawX     = buildingWorldX - (propiedad.renderW / 2f),
-                lWorldX    = labelWorldX,
-                lWorldY    = labelWorldY,
+                propiedad = propiedad,
+                bWorldX = wx,
+                bWorldY = wy,
+                bDrawX = wx - w * 0.5f,
+                bWidth = w,
+                bHeight = h,
+                bRotation = rot,
+                bFlipX = flipX,
+                bFlipY = flipY,
+                bSortY = sortY,
+                bSortIndex = sortIndex,
+                lWorldX = labelX,
+                lWorldY = labelY,
                 nameLayout = layout,
-                nameBgW    = bgW,
-                nameBgH    = bgH,
-                nameTextX  = labelWorldX - (layout.width  / 2f),
-                nameTextY  = labelWorldY + (layout.height / 2f),
-                cachedTex  = getBuildingTexture(propiedad)
+                nameBgW = bgW,
+                nameBgH = bgH,
+                nameTextX = labelX - layout.width * 0.5f,
+                nameTextY = labelY + layout.height * 0.5f,
+                cachedTex = if (propiedad.comprada) getBuildingTexture(propiedad) else null
             ))
+            registrados++
+            Gdx.app.log("EDU_BUILD", "REGISTRO id=$id, comprada=${propiedad.comprada}, anclaje=${anchor != null}, origen=${origen != null}, posicion=($wx,$wy)")
         }
-
-        // Precalcular acumuladores para el HUD
+        Gdx.app.log("EDU_BUILD", "RESUMEN: ${registrados}/${PropiedadRepository.propiedades.size} propiedades, anclajes ausentes=$sinAnclaje")
+        sincronizarEdificiosComprados()
         recalcularHUDCache()
     }
 
@@ -616,31 +957,155 @@ class GameScreen(game: Main) : BaseScreen(game) {
 
     // ── Render ────────────────────────────────────────────────────────
     override fun render(delta: Float) {
-        clearScreen(0f, 0f, 0f, 1f)
+        clearScreen(0.34f, 0.51f, 0.22f, 1f)
 
         if (modoCarga) {
-            actualizarCamara()      // También llama updateScreenRect()
+            // El campus permanece visible: el interior se superpone sin fondo negro.
+            actualizarCamara(delta)
             renderizarMundo(delta)
+            if (Gdx.graphics.frameId == 60L) {
+                Gdx.app.log(
+                    "MAP_DEBUG",
+                    "Renderizador: ${renderer != null}"
+                )
+
+                Gdx.app.log(
+                    "MAP_DEBUG",
+                    "Camara: ${camera.position} Zoom: ${camera.zoom}"
+                )
+            }
             actualizarCicloDeJuego(delta)
             actualizarIndicadoresHUD()
         }
 
+        if (modoCarga) {
+            tiempoDiagnosticoFPS += delta
+            if (tiempoDiagnosticoFPS >= 3f) {
+                com.badlogic.gdx.Gdx.app.log("PERFORMANCE", "FPS: ${com.badlogic.gdx.Gdx.graphics.framesPerSecond}")
+                tiempoDiagnosticoFPS = 0f
+            }
+        }
         stage.act(delta)
         stage.draw()
     }
 
-    private fun actualizarCamara() {
-        camera.position.lerp(targetCameraPos, 0.2f)
+    private val limitesVisualesCampus = Rectangle()
+    private var limitesVisualesCalculados = false
+
+    private fun limitarCamaraAlCampus() {
+        if (!limitesVisualesCalculados) {
+            limitesVisualesCalculados =
+                objectLayerRenderer?.getVisualBounds(limitesVisualesCampus) == true
+            if (!limitesVisualesCalculados) return
+        }
+
+        val halfW = camera.viewportWidth * camera.zoom * 0.5f
+        val halfH = camera.viewportHeight * camera.zoom * 0.5f
+        // Pequeño espacio para apreciar bardas y fachadas completas.
+        val margenExterior = 225f
+        val minX = limitesVisualesCampus.x + halfW - margenExterior
+        val maxX = limitesVisualesCampus.x + limitesVisualesCampus.width - halfW + margenExterior
+        val minY = limitesVisualesCampus.y + halfH - margenExterior
+        val maxY = limitesVisualesCampus.y + limitesVisualesCampus.height - halfH + margenExterior
+
+        targetCameraPos.x = if (minX <= maxX)
+            targetCameraPos.x.coerceIn(minX, maxX)
+        else limitesVisualesCampus.x + limitesVisualesCampus.width * 0.5f
+
+        targetCameraPos.y = if (minY <= maxY)
+            targetCameraPos.y.coerceIn(minY, maxY)
+        else limitesVisualesCampus.y + limitesVisualesCampus.height * 0.5f
+    }
+
+    private fun actualizarCamara(delta: Float) {
+        limitarCamaraAlCampus()
+        val alpha = 1f - kotlin.math.exp(-12f * delta.coerceIn(0f, 0.05f))
+        camera.position.lerp(targetCameraPos, alpha)
         camera.update()
         renderer?.setView(camera)
         // OPTIMIZACIÓN: Actualizar el rect de culling 2D una vez por frame
         updateScreenRect()
     }
 
+
+    /**
+     * Césped liviano con la textura REAL de grasss.png, sin el contorno
+     * transparente en rombos. Obtiene únicamente la zona central opaca de
+     * la imagen isométrica y la convierte en una textura repetible.
+     * La textura se crea una vez, no por fotograma.
+     */
+    private fun dibujarPastoRapido(batch: com.badlogic.gdx.graphics.g2d.Batch) {
+        if (!fondoPastoIntentado) {
+            fondoPastoIntentado = true
+            var fuente: Pixmap? = null
+            var textura: Pixmap? = null
+            try {
+                val src = Pixmap(Gdx.files.internal("Mapa/calles/grasss.png"))
+                fuente = src
+                // El centro del rombo es opaco. No copiar esquinas transparentes.
+                val sw = (src.width / 3).coerceAtLeast(2)
+                val sh = (src.height / 3).coerceAtLeast(2)
+                val sx = (src.width - sw) / 2
+                val sy = (src.height - sh) / 2
+                val dst = Pixmap(128, 128, Pixmap.Format.RGBA8888)
+                textura = dst
+                val seed = src.getPixel(src.width / 2, src.height / 2)
+                for (yy in 0 until 128) {
+                    // Reflejar bordes: primero y último píxel coinciden.
+                    val fy = if (yy < 64) yy else 127 - yy
+                    val srcY = sy + fy * (sh - 1) / 63
+                    for (xx in 0 until 128) {
+                        val fx = if (xx < 64) xx else 127 - xx
+                        val srcX = sx + fx * (sw - 1) / 63
+                        val rgba = src.getPixel(srcX, srcY)
+                        val color = if ((rgba and 255) < 32) seed else rgba
+                        dst.drawPixel(xx, yy, (color and -256) or 255)
+                    }
+                }
+                fondoPastoRapido = Texture(dst).apply {
+                    setWrap(Texture.TextureWrap.Repeat, Texture.TextureWrap.Repeat)
+                    setFilter(Texture.TextureFilter.Linear, Texture.TextureFilter.Linear)
+                }
+                Gdx.app.log("MAP_GRASS", "Patrón real de grasss.png sin rombos: 128x128")
+            } catch (e: Exception) {
+                Gdx.app.error("MAP_GRASS", "No fue posible preparar grasss.png", e)
+            } finally {
+                textura?.dispose()
+                fuente?.dispose()
+            }
+        }
+        val tex = fondoPastoRapido ?: return
+        val halfW = camera.viewportWidth * camera.zoom * 0.5f
+        val halfH = camera.viewportHeight * camera.zoom * 0.5f
+        val left = camera.position.x - halfW - 64f
+        val bottom = camera.position.y - halfH - 64f
+        val w = halfW * 2f + 128f
+        val h = halfH * 2f + 128f
+        batch.projectionMatrix = camera.combined
+        batch.begin()
+        try {
+            batch.color = Color.WHITE
+            val period = 128f
+            batch.draw(tex, left, bottom, w, h,
+                left / period, bottom / period,
+                (left + w) / period, (bottom + h) / period)
+        } finally {
+            batch.end()
+        }
+    }
+
     private fun renderizarMundo(delta: Float) {
         val r = renderer ?: return
         val zoom = camera.zoom
-        r.render(layerIndicesToRender)
+        // La base de césped se mantiene ligera. Las teselas NUEVAS (pisos,
+        // caminos decorativos) sobreviven en el Fondo_pasto del runtime.
+        if (!pastoDetallado) dibujarPastoRapido(r.batch)
+        if (layerIndicesToRender.isNotEmpty()) r.render(layerIndicesToRender)
+        // Los objetos de Tiled se renderizan por separado: el renderer isometrico
+        // no procesa TiledMapTileMapObject de las capas de objetos.
+        // Capas y objetos en el mismo orden que Tiled; edificios comprados
+        // intercalados con el resto de la capa Edificios.
+        objectLayerRenderer?.render(r.batch, camera)
 
         r.batch.begin()
         try {
@@ -649,35 +1114,8 @@ class GameScreen(game: Main) : BaseScreen(game) {
             val drawLabels    = zoom <= maxZoomForLabels
             val useSmallScale = zoom > maxZoomForFullBuildings
 
-            // ====================== EDIFICIOS COMPRADOS ======================
-            for (entry in renderEntries) {
-                if (!entry.propiedad.comprada) continue
-
-                val p   = entry.propiedad
-                val tex = entry.cachedTex ?: continue
-
-                // Culling 2D usando coordenadas del EDIFICIO
-                if (!isVisible(entry.bWorldX, entry.bWorldY, p.renderW, p.renderH)) continue
-
-                var drawY = entry.bWorldY
-                var scale = 1f
-
-                // LOD + Fix visual para Edificios generales
-                if (useSmallScale) {
-                    scale = 0.72f
-                    // Subir un poco los edificios 1 y 2 cuando se encogen para que no se hundan
-                    smallBuildingYOffset[p.id]?.let { offset ->
-                        drawY += offset * (zoom - maxZoomForFullBuildings) / 2f
-                    }
-                }
-
-                val w = p.renderW * scale
-                val h = p.renderH * scale
-                // Centrar horizontalmente al escalar (usando el centro original bWorldX)
-                val drawX = entry.bDrawX + (p.renderW - w) * 0.5f
-
-                r.batch.draw(tex, drawX, drawY, w, h)
-            }
+            // Los edificios comprados ya se dibujaron en su posición correcta
+            // dentro de Edificios; no repetirlos encima de árboles/caminos.
 
             // ====================== ETIQUETAS (solo si cerca) ======================
             if (drawLabels) {
@@ -767,14 +1205,21 @@ class GameScreen(game: Main) : BaseScreen(game) {
     }
 
     // ── Resize / Dispose ──────────────────────────────────────────────
+    override fun hide() {
+        cerrarInterior()
+        super.hide()
+    }
+
     override fun resize(width: Int, height: Int) {
         super.resize(width, height)
-        camera.viewportWidth  = width.toFloat()
-        camera.viewportHeight = height.toFloat()
+        // Altura virtual fija: misma escala visual en dispositivos distintos.
+        camera.viewportHeight = virtualHeight
+        camera.viewportWidth = virtualHeight * width.coerceAtLeast(1).toFloat() / height.coerceAtLeast(1).toFloat()
         camera.update()
     }
 
     override fun dispose() {
+        cerrarInterior()
         super.dispose()
         backgroundTexture.dispose()
         menuIconTexture.dispose()
@@ -783,6 +1228,8 @@ class GameScreen(game: Main) : BaseScreen(game) {
         labelBgTexture.dispose()
         buildingTextureCache.values.forEach { it?.dispose() }
         buildingTextureCache.clear()
+        fondoPastoRapido?.dispose()
+        renderer?.dispose()
         map?.dispose()
     }
 
@@ -800,7 +1247,7 @@ class GameScreen(game: Main) : BaseScreen(game) {
             actor.isVisible = true
             actor.mostrarConversacion(listOf(
                 Dialogo("Ing. Cárdenas", "¡Bienvenido, Director! Vamos a darte un recorrido rápido por las herramientas de gestión.", "sprite_saludando.png") {
-                    targetCameraPos.set(-436f, 1360f, 0f)
+                    getBuildingPos("Biblioteca")?.let { targetCameraPos.set(it) }
                     camera.zoom = 6f
                     tutorialHighlightPos = null
                 },
@@ -823,7 +1270,7 @@ class GameScreen(game: Main) : BaseScreen(game) {
                     }
                 },
                 Dialogo("Ing. Cárdenas", "No olvides explorar todo el campus arrastrando el dedo y haciendo zoom.", "sprite_saludando.png") {
-                    targetCameraPos.set(-436f, 1360f, 0f)
+                    getBuildingPos("Biblioteca")?.let { targetCameraPos.set(it) }
                     initialZoom = 5f; camera.zoom = 5f
                     tutorialHighlightPos = null
                 },

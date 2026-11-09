@@ -198,7 +198,7 @@ class PartidasGuardadas(game: Main) : BaseScreen(game) {
                 if (ok) { gameScreen.modoCarga = true; game.setScreen<GameScreen>() }
             }
         } else {
-            GameState.reset(GameState.DINERO_INICIAL_REAL); GameState.slotActual = slotNum
+            GameState.reset(GameState.presupuestoNuevaPartida()); GameState.slotActual = slotNum
             PropiedadRepository.resetProgress()
             gameScreen.modoCarga = false
             game.setScreen<GameScreen>()

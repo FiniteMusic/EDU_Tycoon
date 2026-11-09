@@ -8,7 +8,8 @@ import ktx.scene2d.*
 
 class BuildingInfoWindow(
     private val data: Propiedad,
-    private val onBuildingChanged: () -> Unit
+    private val onBuildingChanged: () -> Unit,
+    private val onInteriorRequested: ((Propiedad) -> Unit)? = null
 ) : VisWindow("Gestión del Plantel") {
 
     init {
@@ -116,6 +117,18 @@ class BuildingInfoWindow(
                     this@BuildingInfoWindow.remove()
                 }
             }.cell(padTop = 14f, expandX = true, fillX = true)
+
+            // PASO 2: Disponible sólo para edificios comprados y con PNG interior.
+            if (data.comprada && data.nivel >= 1 &&
+                data.interiorTexturePrefix != null && onInteriorRequested != null) {
+                row()
+                textButton("ENTRAR AL INTERIOR · NIVEL ${data.nivel}") {
+                    onChange {
+                        this@BuildingInfoWindow.remove()
+                        onInteriorRequested?.invoke(data)
+                    }
+                }.cell(padTop = 9f, expandX = true, fillX = true)
+            }
         }).pad(16f)
 
         pack()

@@ -1,0 +1,160 @@
+package io.moviles.IPN_Tycoon
+
+import com.badlogic.gdx.Gdx
+import com.badlogic.gdx.graphics.Color
+import com.badlogic.gdx.graphics.Texture
+import com.badlogic.gdx.scenes.scene2d.InputEvent
+import com.badlogic.gdx.scenes.scene2d.InputListener
+import com.badlogic.gdx.scenes.scene2d.Stage
+import com.badlogic.gdx.scenes.scene2d.Touchable
+import com.badlogic.gdx.scenes.scene2d.ui.Image
+import com.badlogic.gdx.scenes.scene2d.ui.Label
+import com.badlogic.gdx.scenes.scene2d.ui.Table
+import com.badlogic.gdx.scenes.scene2d.ui.TextButton
+import com.badlogic.gdx.scenes.scene2d.utils.ClickListener
+import com.badlogic.gdx.utils.Align
+import com.badlogic.gdx.utils.Scaling
+import ktx.scene2d.Scene2DSkin
+
+/**
+ * Vista completa de un interior dentro del Stage actual del campus.
+ * No sustituye GameScreen: conserva la cámara, el HUD y la lógica de compras.
+ * Abre únicamente la textura del interior actual y la libera al salir.
+ */
+class InteriorOverlay(
+    private val stage: Stage,
+    private val propiedad: Propiedad,
+    private val alAdministrar: (Propiedad) -> Unit,
+    private val alCerrar: () -> Unit
+) {
+    private var raiz: Table? = null
+    private var textura: Texture? = null
+    private var cerrado = false
+
+    fun mostrar() {
+        check(raiz == null && !cerrado) { "El interior ya se abrió o se cerró" }
+        val skin = Scene2DSkin.defaultSkin
+        val ruta = InteriorAssets.buscar(propiedad)
+
+        val imagen: Image? = if (ruta != null) {
+            try {
+                val archivo = Gdx.files.internal(ruta)
+                if (!archivo.exists()) {
+                    Gdx.app.error("EDU_INTERIOR", "PNG NO EXISTE: $ruta")
+                    null
+                } else {
+                    val cargada = Texture(archivo).apply {
+                        setFilter(Texture.TextureFilter.Linear, Texture.TextureFilter.Linear)
+                    }
+                    textura = cargada
+                    Gdx.app.log("EDU_INTERIOR", "ABIERTO: ${propiedad.id} nivel=${propiedad.nivel} ruta=$ruta")
+                    Image(cargada).apply {
+                        setScaling(Scaling.fit)
+                        setAlign(Align.center)
+                    }
+                }
+            } catch (error: Exception) {
+                Gdx.app.error("EDU_INTERIOR", "ERROR CARGANDO $ruta", error)
+                textura?.dispose()
+                textura = null
+                null
+            }
+        } else {
+            Gdx.app.error("EDU_INTERIOR", "SIN RUTA: ${propiedad.id} nivel=${propiedad.nivel}")
+            null
+        }
+
+        val contenedor = Table().apply {
+            setFillParent(true)
+            touchable = Touchable.enabled
+            background = skin.newDrawable("white", Color(0.035f, 0.055f, 0.09f, 1f))
+            // Consume los toques fuera de los botones. No arrastra el mapa.
+            addListener(object : InputListener() {
+                override fun touchDown(event: InputEvent?, x: Float, y: Float, pointer: Int, button: Int): Boolean = true
+            })
+        }
+
+        val cabecera = Table().apply {
+            background = skin.newDrawable("white", Color(0.08f, 0.12f, 0.16f, 1f))
+            pad(10f)
+        }
+        cabecera.add(Label(propiedad.nombre, skin)).expandX().left().padLeft(12f)
+        cabecera.add(Label("Interior · Nivel ${propiedad.nivel}", skin)).padRight(18f)
+        val botonGestion = TextButton("GESTIONAR / MEJORAR", skin)
+        botonGestion.addListener(object : ClickListener() {
+            override fun clicked(event: InputEvent?, x: Float, y: Float) {
+                cerrar()
+                alAdministrar(propiedad)
+            }
+        })
+        cabecera.add(botonGestion).width(190f).height(43f).padRight(10f)
+        val botonVolver = TextButton("VOLVER AL CAMPUS", skin)
+        botonVolver.addListener(object : ClickListener() {
+            override fun clicked(event: InputEvent?, x: Float, y: Float) {
+                cerrar()
+            }
+        })
+        cabecera.add(botonVolver).width(190f).height(43f)
+
+        contenedor.add(cabecera).growX().height(65f).row()
+        if (imagen != null) {
+            contenedor.add(imagen).grow().pad(6f)
+        } else {
+            val aviso = if (ruta == null) {
+                "No existe un interior configurado para ${propiedad.nombre}, nivel ${propiedad.nivel}."
+            } else {
+                "No se pudo mostrar el interior. Revisa Logcat: EDU_INTERIOR.\nRuta: $ruta"
+            }
+            contenedor.add(Label(aviso, skin).apply {
+                setAlignment(Align.center)
+                setWrap(true)
+            }).grow().pad(24f)
+        }
+        raiz = contenedor
+        stage.addActor(contenedor)
+        contenedor.toFront()
+    }
+
+    fun cerrar() {
+        if (cerrado) return
+        cerrado = true
+        raiz?.remove()
+        raiz = null
+        textura?.dispose()
+        textura = null
+        alCerrar()
+    }
+}
+
+/** Resuelve IDs/ niveles a rutas de assets, sin directorios escaneados cada fotograma. */
+object InteriorAssets {
+    private const val MANIFIESTO = "Mapa/interiores_manifest.txt"
+
+    private val rutas: Map<String, String> by lazy {
+        val archivo = Gdx.files.internal(MANIFIESTO)
+        if (!archivo.exists()) return@lazy emptyMap()
+        val resultado = mutableMapOf<String, String>()
+        try {
+            archivo.readString("UTF-8").lineSequence().forEach { linea ->
+                val limpia = linea.trim()
+                if (limpia.isBlank() || limpia.startsWith("#")) return@forEach
+                val trozos = limpia.split('|', limit = 3)
+                if (trozos.size == 3) {
+                    resultado["${trozos[0].trim()}|${trozos[1].trim()}"] =
+                        trozos[2].trim().replace('\\', '/')
+                }
+            }
+        } catch (error: Exception) {
+            Gdx.app.error("EDU_INTERIOR", "No se pudo leer el manifiesto", error)
+        }
+        resultado
+    }
+
+    fun buscar(propiedad: Propiedad): String? {
+        if (!propiedad.comprada || propiedad.nivel < 1) return null
+        val rutaManifiesto = rutas["${propiedad.id}|${propiedad.nivel}"]
+        if (rutaManifiesto != null) return rutaManifiesto
+        val prefijo = propiedad.interiorTexturePrefix ?: return null
+        return "Mapa/Edificios/${prefijo}lvl${propiedad.nivel}.png"
+    }
+}

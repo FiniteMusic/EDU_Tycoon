@@ -14,6 +14,10 @@ object GameState {
     const val DINERO_INICIAL_REAL: Long = 500_000L
     const val DINERO_INICIAL_TEST: Long = 100_000_000L
 
+    // Inyectado exclusivamente por AndroidLauncher: solo BuildConfig.DEBUG.
+    var presupuestoInicialPruebasAndroid: Long? = null
+    fun presupuestoNuevaPartida(): Long = presupuestoInicialPruebasAndroid ?: DINERO_INICIAL_REAL
+
     var dinero: Long = DINERO_INICIAL_REAL
     var alumnosTotales: Int = 0
 
