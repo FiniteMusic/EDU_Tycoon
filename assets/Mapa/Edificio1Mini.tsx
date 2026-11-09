@@ -3,6 +3,6 @@
  <tileoffset x="-4" y="0"/>
  <grid orientation="orthogonal" width="1" height="1"/>
  <tile id="0">
-  <image source="Edificios/escomlvl1.png" width="1408" height="768"/>
+  <image source="Edificios/computolvl1.png" width="1408" height="768"/>
  </tile>
 </tileset>
