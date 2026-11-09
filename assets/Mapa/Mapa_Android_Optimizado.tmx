@@ -1,5 +1,5 @@
 <?xml version='1.0' encoding='utf-8'?>
-<map version="1.10" tiledversion="1.12.2" orientation="isometric" renderorder="right-down" width="500" height="500" tilewidth="64" tileheight="32" infinite="0" nextlayerid="25" nextobjectid="2458">
+<map version="1.10" tiledversion="1.12.2" orientation="isometric" renderorder="right-down" width="500" height="500" tilewidth="64" tileheight="32" infinite="0" nextlayerid="27" nextobjectid="2476">
  <tileset firstgid="1" source="calles/calles_runtime.tsx" />
  <objectgroup id="7" name="Logica_Clics">
   <object id="18" name="Computo" type="edificio_clickable" x="2085.01" y="550.088" width="1945.04" height="2063.17" />
@@ -1208,7 +1208,7 @@
   <object id="1754" gid="120" x="1415.73" y="9463.72" width="374.758" height="321.879"><properties><property name="_eduSortY" type="float" value="9463.72" /><property name="_eduSortIndex" type="int" value="24" /></properties></object>
   <object id="1758" gid="107" x="2537.38" y="9417.78" width="509" height="670"><properties><property name="_eduSortY" type="float" value="9417.78" /><property name="_eduSortIndex" type="int" value="25" /></properties></object>
   <object id="1760" gid="120" x="2130.1" y="9434.51" width="374.758" height="321.879"><properties><property name="_eduSortY" type="float" value="9434.51" /><property name="_eduSortIndex" type="int" value="26" /></properties></object>
-  <object id="1761" gid="132" x="4356" y="10820" width="636" height="716"><properties><property name="_eduSortY" type="float" value="10820" /><property name="_eduSortIndex" type="int" value="27" /></properties></object>
+  <object id="1761" gid="132" x="4424" y="10800" width="636" height="716"><properties><property name="_eduSortY" type="float" value="10800" /><property name="_eduSortIndex" type="int" value="27" /></properties></object>
   <object id="1763" gid="132" x="3730" y="6914" width="636" height="716"><properties><property name="_eduSortY" type="float" value="6914" /><property name="_eduSortIndex" type="int" value="28" /></properties></object>
   <object id="1764" gid="123" x="3610.25" y="8903.75" width="267" height="237"><properties><property name="_eduSortY" type="float" value="8903.75" /><property name="_eduSortIndex" type="int" value="29" /></properties></object>
   <object id="1765" gid="123" x="2986.5" y="8881.5" width="267" height="237"><properties><property name="_eduSortY" type="float" value="8881.5" /><property name="_eduSortIndex" type="int" value="30" /></properties></object>

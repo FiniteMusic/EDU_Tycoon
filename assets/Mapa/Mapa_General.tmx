@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<map version="1.10" tiledversion="1.12.2" orientation="isometric" renderorder="right-down" width="500" height="500" tilewidth="64" tileheight="32" infinite="0" nextlayerid="25" nextobjectid="2440">
+<map version="1.10" tiledversion="1.12.2" orientation="isometric" renderorder="right-down" width="500" height="500" tilewidth="64" tileheight="32" infinite="0" nextlayerid="27" nextobjectid="2476">
  <tileset firstgid="1" source="calles/calles.tsx"/>
  <tileset firstgid="170" source="Edificio1Mini.tsx"/>
  <tileset firstgid="171" name="palapas" tilewidth="2400" tileheight="1308" tilecount="1" columns="0">
@@ -1343,6 +1343,264 @@
   <object id="2438" gid="103" x="11726.8" y="5985.95" width="845.758" height="852.273"/>
   <object id="2439" gid="131" x="7691" y="9515" width="510" height="878"/>
  </objectgroup>
+ <objectgroup color="#ffd166" id="24" name="EDU_NIVEL_2" opacity="0.78">
+  <object id="2440" name="Arquitectura NIVEL 2" gid="192" x="10979.8" y="7032.79" width="4412.37" height="3486.85" rotation="359.3">
+   <properties>
+    <property name="editorSolo" type="bool" value="true"/>
+    <property name="nivelEdificio" type="int" value="2"/>
+    <property name="propiedadId" value="Arquitectura"/>
+   </properties>
+  </object>
+  <object id="2441" name="Arte_diseno_deporte NIVEL 2" gid="2147483871" x="12904.2" y="2265.51" width="3058.19" height="2685.08" rotation="3.40033">
+   <properties>
+    <property name="editorSolo" type="bool" value="true"/>
+    <property name="nivelEdificio" type="int" value="2"/>
+    <property name="propiedadId" value="Arte_diseno_deporte"/>
+   </properties>
+  </object>
+  <object id="2442" name="Biblioteca NIVEL 2" gid="2147483881" x="7554.51" y="6743.75" width="4248.8" height="3841.84" rotation="1.60836">
+   <properties>
+    <property name="editorSolo" type="bool" value="true"/>
+    <property name="nivelEdificio" type="int" value="2"/>
+    <property name="propiedadId" value="Biblioteca"/>
+   </properties>
+  </object>
+  <object id="2443" name="Biologicas NIVEL 2" gid="195" x="6942.09" y="3108.79" width="3588.07" height="2912" rotation="0.0998712">
+   <properties>
+    <property name="editorSolo" type="bool" value="true"/>
+    <property name="nivelEdificio" type="int" value="2"/>
+    <property name="propiedadId" value="Biologicas"/>
+   </properties>
+  </object>
+  <object id="2444" name="Bioquimica NIVEL 2" gid="198" x="10166.9" y="2983.79" width="3382" height="3045.16" rotation="1.94445">
+   <properties>
+    <property name="editorSolo" type="bool" value="true"/>
+    <property name="nivelEdificio" type="int" value="2"/>
+    <property name="propiedadId" value="Bioquimica"/>
+   </properties>
+  </object>
+  <object id="2445" name="Direccion NIVEL 2" gid="182" x="4182.89" y="13559.8" width="5960.98" height="4086.33" rotation="357.454">
+   <properties>
+    <property name="editorSolo" type="bool" value="true"/>
+    <property name="nivelEdificio" type="int" value="2"/>
+    <property name="propiedadId" value="Direccion"/>
+   </properties>
+  </object>
+  <object id="2446" name="Dormitorios NIVEL 2" gid="267" x="7075.03" y="9566.61" width="4155.65" height="3630.2" rotation="355.85">
+   <properties>
+    <property name="editorSolo" type="bool" value="true"/>
+    <property name="nivelEdificio" type="int" value="2"/>
+    <property name="propiedadId" value="Dormitorios"/>
+   </properties>
+  </object>
+  <object id="2447" name="Edificio1 NIVEL 2" gid="2147483930" x="2870" y="5922" width="3929.2" height="3164.98">
+   <properties>
+    <property name="editorSolo" type="bool" value="true"/>
+    <property name="nivelEdificio" type="int" value="2"/>
+    <property name="propiedadId" value="Edificio1"/>
+   </properties>
+  </object>
+  <object id="2448" name="Edificio2 NIVEL 2" gid="2147483905" x="4108" y="5468" width="2069.88" height="1555.7">
+   <properties>
+    <property name="editorSolo" type="bool" value="true"/>
+    <property name="nivelEdificio" type="int" value="2"/>
+    <property name="propiedadId" value="Edificio2"/>
+   </properties>
+  </object>
+  <object id="2449" name="Gastronomia NIVEL 2" gid="2147483921" x="2459.25" y="9014.75" width="2877.34" height="2610.38">
+   <properties>
+    <property name="editorSolo" type="bool" value="true"/>
+    <property name="nivelEdificio" type="int" value="2"/>
+    <property name="propiedadId" value="Gastronomia"/>
+   </properties>
+  </object>
+  <object id="2450" name="Mac_and_cheese NIVEL 2" gid="2147483893" x="14455" y="4627" width="3066.28" height="2735.4">
+   <properties>
+    <property name="editorSolo" type="bool" value="true"/>
+    <property name="nivelEdificio" type="int" value="2"/>
+    <property name="propiedadId" value="Mac_and_cheese"/>
+   </properties>
+  </object>
+  <object id="2451" name="Matematicas NIVEL 2" gid="2147483849" x="13897.3" y="7447.14" width="3932.64" height="2971.1" rotation="0.79196">
+   <properties>
+    <property name="editorSolo" type="bool" value="true"/>
+    <property name="nivelEdificio" type="int" value="2"/>
+    <property name="propiedadId" value="Matematicas"/>
+   </properties>
+  </object>
+  <object id="2452" name="Museo NIVEL 2" gid="208" x="13707.5" y="10962.9" width="4341.18" height="3698.45" rotation="360.981">
+   <properties>
+    <property name="editorSolo" type="bool" value="true"/>
+    <property name="nivelEdificio" type="int" value="2"/>
+    <property name="propiedadId" value="Museo"/>
+   </properties>
+  </object>
+  <object id="2453" name="Turismo NIVEL 2" gid="2147483859" x="11247.6" y="13961.4" width="3974.85" height="3651.74" rotation="357.118">
+   <properties>
+    <property name="editorSolo" type="bool" value="true"/>
+    <property name="nivelEdificio" type="int" value="2"/>
+    <property name="propiedadId" value="Turismo"/>
+   </properties>
+  </object>
+  <object id="2454" name="auditorio NIVEL 2" gid="2147483838" x="8296.08" y="13125.3" width="4879.54" height="3722.14" rotation="355.424">
+   <properties>
+    <property name="editorSolo" type="bool" value="true"/>
+    <property name="nivelEdificio" type="int" value="2"/>
+    <property name="propiedadId" value="auditorio"/>
+   </properties>
+  </object>
+  <object id="2455" name="cafeteria NIVEL 2" gid="2147483939" x="4214.24" y="8714.1" width="2650.8" height="2175.16" rotation="2.17272">
+   <properties>
+    <property name="editorSolo" type="bool" value="true"/>
+    <property name="nivelEdificio" type="int" value="2"/>
+    <property name="propiedadId" value="cafeteria"/>
+   </properties>
+  </object>
+  <object id="2456" name="escom_hitbox NIVEL 2" gid="251" x="4129.05" y="2718.96" width="3262.69" height="2515.49" rotation="359.675">
+   <properties>
+    <property name="editorSolo" type="bool" value="true"/>
+    <property name="nivelEdificio" type="int" value="2"/>
+    <property name="propiedadId" value="escom_hitbox"/>
+   </properties>
+  </object>
+  <object id="2457" name="palapas NIVEL 2" gid="214" x="1579.06" y="2530.21" width="1723.96" height="1347.96" rotation="358.173">
+   <properties>
+    <property name="editorSolo" type="bool" value="true"/>
+    <property name="nivelEdificio" type="int" value="2"/>
+    <property name="propiedadId" value="palapas"/>
+   </properties>
+  </object>
+ </objectgroup>
+ <objectgroup color="#ffd166" id="25" name="EDU_NIVEL_3" opacity="0.78">
+  <object id="2458" name="Arquitectura NIVEL 3" gid="193" x="10745.2" y="6818.1" width="4191.13" height="3910.76" rotation="0.116036">
+   <properties>
+    <property name="editorSolo" type="bool" value="true"/>
+    <property name="nivelEdificio" type="int" value="3"/>
+    <property name="propiedadId" value="Arquitectura"/>
+   </properties>
+  </object>
+  <object id="2459" name="Arte_diseno_deporte NIVEL 3" gid="2147483872" x="12994.8" y="2440.65" width="2764.47" height="2530.34" rotation="3.40033">
+   <properties>
+    <property name="editorSolo" type="bool" value="true"/>
+    <property name="nivelEdificio" type="int" value="3"/>
+    <property name="propiedadId" value="Arte_diseno_deporte"/>
+   </properties>
+  </object>
+  <object id="2460" name="Biblioteca NIVEL 3" gid="234" x="7649.94" y="6703.14" width="4300.81" height="4176.47" rotation="4.72033">
+   <properties>
+    <property name="editorSolo" type="bool" value="true"/>
+    <property name="nivelEdificio" type="int" value="3"/>
+    <property name="propiedadId" value="Biblioteca"/>
+   </properties>
+  </object>
+  <object id="2461" name="Biologicas NIVEL 3" gid="196" x="6942.09" y="3108.79" width="3359.05" height="2726.13" rotation="0.0998712">
+   <properties>
+    <property name="editorSolo" type="bool" value="true"/>
+    <property name="nivelEdificio" type="int" value="3"/>
+    <property name="propiedadId" value="Biologicas"/>
+   </properties>
+  </object>
+  <object id="2462" name="Bioquimica NIVEL 3" gid="199" x="10166.9" y="2983.79" width="3166.13" height="2850.79" rotation="1.94445">
+   <properties>
+    <property name="editorSolo" type="bool" value="true"/>
+    <property name="nivelEdificio" type="int" value="3"/>
+    <property name="propiedadId" value="Bioquimica"/>
+   </properties>
+  </object>
+  <object id="2463" name="Direccion NIVEL 3" gid="183" x="4542.35" y="13529.6" width="5973.51" height="4525.55" rotation="357.454">
+   <properties>
+    <property name="editorSolo" type="bool" value="true"/>
+    <property name="nivelEdificio" type="int" value="3"/>
+    <property name="propiedadId" value="Direccion"/>
+   </properties>
+  </object>
+  <object id="2464" name="Dormitorios NIVEL 3" gid="268" x="7099.08" y="9532" width="3890.39" height="3398.48" rotation="353.864">
+   <properties>
+    <property name="editorSolo" type="bool" value="true"/>
+    <property name="nivelEdificio" type="int" value="3"/>
+    <property name="propiedadId" value="Dormitorios"/>
+   </properties>
+  </object>
+  <object id="2465" name="Edificio1 NIVEL 3" gid="2147483931" x="2870" y="5922" width="3678.4" height="2962.96">
+   <properties>
+    <property name="editorSolo" type="bool" value="true"/>
+    <property name="nivelEdificio" type="int" value="3"/>
+    <property name="propiedadId" value="Edificio1"/>
+   </properties>
+  </object>
+  <object id="2466" name="Edificio2 NIVEL 3" gid="2147483906" x="4108" y="5468" width="1937.76" height="1456.4">
+   <properties>
+    <property name="editorSolo" type="bool" value="true"/>
+    <property name="nivelEdificio" type="int" value="3"/>
+    <property name="propiedadId" value="Edificio2"/>
+   </properties>
+  </object>
+  <object id="2467" name="Gastronomia NIVEL 3" gid="2147483922" x="2459.25" y="9014.75" width="2693.68" height="2443.76">
+   <properties>
+    <property name="editorSolo" type="bool" value="true"/>
+    <property name="nivelEdificio" type="int" value="3"/>
+    <property name="propiedadId" value="Gastronomia"/>
+   </properties>
+  </object>
+  <object id="2468" name="Mac_and_cheese NIVEL 3" gid="2147483894" x="14455" y="4627" width="2870.56" height="2560.8">
+   <properties>
+    <property name="editorSolo" type="bool" value="true"/>
+    <property name="nivelEdificio" type="int" value="3"/>
+    <property name="propiedadId" value="Mac_and_cheese"/>
+   </properties>
+  </object>
+  <object id="2469" name="Matematicas NIVEL 3" gid="2147483850" x="13897.3" y="7447.14" width="3681.62" height="2781.45" rotation="0.79196">
+   <properties>
+    <property name="editorSolo" type="bool" value="true"/>
+    <property name="nivelEdificio" type="int" value="3"/>
+    <property name="propiedadId" value="Matematicas"/>
+   </properties>
+  </object>
+  <object id="2470" name="Museo NIVEL 3" gid="209" x="13491.5" y="10668.8" width="4172.23" height="3688.26" rotation="360.981">
+   <properties>
+    <property name="editorSolo" type="bool" value="true"/>
+    <property name="nivelEdificio" type="int" value="3"/>
+    <property name="propiedadId" value="Museo"/>
+   </properties>
+  </object>
+  <object id="2471" name="Turismo NIVEL 3" gid="2147483860" x="11179.6" y="13901.4" width="3721.13" height="3418.65" rotation="357.118">
+   <properties>
+    <property name="editorSolo" type="bool" value="true"/>
+    <property name="nivelEdificio" type="int" value="3"/>
+    <property name="propiedadId" value="Turismo"/>
+   </properties>
+  </object>
+  <object id="2472" name="auditorio NIVEL 3" gid="2147483876" x="8264.08" y="13077.3" width="4568.08" height="3484.55" rotation="355.424">
+   <properties>
+    <property name="editorSolo" type="bool" value="true"/>
+    <property name="nivelEdificio" type="int" value="3"/>
+    <property name="propiedadId" value="auditorio"/>
+   </properties>
+  </object>
+  <object id="2473" name="cafeteria NIVEL 3" gid="2147483940" x="4214.24" y="8714.1" width="2481.6" height="2036.32" rotation="2.17272">
+   <properties>
+    <property name="editorSolo" type="bool" value="true"/>
+    <property name="nivelEdificio" type="int" value="3"/>
+    <property name="propiedadId" value="cafeteria"/>
+   </properties>
+  </object>
+  <object id="2474" name="escom_hitbox NIVEL 3" gid="252" x="4129.05" y="2718.96" width="3054.44" height="2354.92" rotation="359.675">
+   <properties>
+    <property name="editorSolo" type="bool" value="true"/>
+    <property name="nivelEdificio" type="int" value="3"/>
+    <property name="propiedadId" value="escom_hitbox"/>
+   </properties>
+  </object>
+ </objectgroup>
+ <objectgroup color="#ffd166" id="26" name="EDU_NIVEL_4" opacity="0.78">
+  <object id="2475" name="Direccion NIVEL 4" gid="184" x="3826.47" y="13569.7" width="6161.41" height="4670.3" rotation="358.809">
+   <properties>
+    <property name="editorSolo" type="bool" value="true"/>
+    <property name="nivelEdificio" type="int" value="4"/>
+    <property name="propiedadId" value="Direccion"/>
+   </properties>
+  </object>
+ </objectgroup>
  <objectgroup id="15" name="Arboles_arbustos">
   <object id="669" gid="2147483789" x="12607.5" y="15586.6" width="842.239" height="796.128" rotation="-2"/>
   <object id="670" gid="2147483789" x="13064.9" y="15587.9" width="842.239" height="796.128" rotation="-2"/>
@@ -1371,7 +1629,7 @@
   <object id="1754" gid="120" x="1415.73" y="9463.72" width="374.758" height="321.879"/>
   <object id="1758" gid="107" x="2537.38" y="9417.78" width="509" height="670"/>
   <object id="1760" gid="120" x="2130.1" y="9434.51" width="374.758" height="321.879"/>
-  <object id="1761" gid="132" x="4356" y="10820" width="636" height="716"/>
+  <object id="1761" gid="132" x="4424" y="10800" width="636" height="716"/>
   <object id="1763" gid="132" x="3730" y="6914" width="636" height="716"/>
   <object id="1764" gid="123" x="3610.25" y="8903.75" width="267" height="237"/>
   <object id="1765" gid="123" x="2986.5" y="8881.5" width="267" height="237"/>
