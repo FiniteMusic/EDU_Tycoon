@@ -1,0 +1,9 @@
+# EDU Tycoon: opcional, ajuste visual de interiores.
+# id|nivel|grados|flipX|flipY
+# Sin reglas activas: se hereda rotación y reflejo del edificio Tiled.
+# Ejemplos (descomentar solamente después de comparar los PNG reales):
+# Arte_diseno_deporte|3|0|true|false
+# Biblioteca|3|0|false|false
+# Direccion|3|0|false|false
+# NOTA: girar un PNG 90 grados no crea una vista frontal; para ello se necesita
+# una ilustración frontal del mismo edificio.
