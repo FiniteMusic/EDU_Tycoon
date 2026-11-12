@@ -40,6 +40,7 @@ class InteriorOverlay(
     private val rotacionExterior: Float,
     private val reflejoExteriorX: Boolean,
     private val reflejoExteriorY: Boolean,
+    private val alReto: (Propiedad) -> Unit,
     private val alAdministrar: (Propiedad) -> Unit,
     private val alCerrar: () -> Unit
 ) {
@@ -145,6 +146,14 @@ class InteriorOverlay(
                 }
             })
             controles.add(mejorar).expandX().fillX().padLeft(4f).padRight(3f)
+            val reto = TextButton("RETO", skin)
+            reto.addListener(object : ClickListener() {
+                override fun clicked(event: InputEvent?, x: Float, y: Float) {
+                    cerrar()
+                    alReto(propiedad)
+                }
+            })
+            controles.add(reto).width(65f).padRight(3f) // EDU_PASO4_MAIN_V1
             val volver = TextButton("VOLVER", skin)
             volver.addListener(object : ClickListener() {
                 override fun clicked(event: InputEvent?, x: Float, y: Float) { cerrar() }

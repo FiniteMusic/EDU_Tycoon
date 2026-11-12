@@ -175,6 +175,7 @@ class PartidasGuardadas(game: Main) : BaseScreen(game) {
                     style = borrarStyle
                     onChange {
                         game.saveManager.eliminarSlot(slotNum) {
+                            ProgresoAdministrador.borrar(slotNum)
                             loadSlots()
                         }
                     }
@@ -195,7 +196,7 @@ class PartidasGuardadas(game: Main) : BaseScreen(game) {
 
         if (currentData != null) {
             game.saveManager.cargarPartida(slotNum) { ok ->
-                if (ok) { gameScreen.modoCarga = true; game.setScreen<GameScreen>() }
+                if (ok) { ProgresoAdministrador.cargar(slotNum); gameScreen.modoCarga = true; game.setScreen<GameScreen>() }
             }
         } else {
             GameState.reset(GameState.presupuestoNuevaPartida()); GameState.slotActual = slotNum

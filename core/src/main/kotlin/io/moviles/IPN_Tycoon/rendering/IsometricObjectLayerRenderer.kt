@@ -206,7 +206,8 @@ class IsometricObjectLayerRenderer(private val map: TiledMap) {
     }
 
     /** Recorre las capas en el orden que Tiled guardó, sin reordenarlas. */
-    fun render(batch: Batch, camera: OrthographicCamera) {
+    fun render(batch: Batch, camera: OrthographicCamera, caminantes: ((Batch) -> Unit)? = null) {
+        var alumnosPintados = false // EDU_PASO5_PROFUNDIDAD
         val hw = camera.viewportWidth * camera.zoom * 0.5f
         val hh = camera.viewportHeight * camera.zoom * 0.5f
         val left = camera.position.x - hw
@@ -233,7 +234,13 @@ class IsometricObjectLayerRenderer(private val map: TiledMap) {
                     if (focus) batch.setColor(1f, 1f, 1f, 1f)
                     drawCount++
                 }
+                // Tiled mantiene Arboles_arbustos y Edificios por encima de Camino.
+                if (name == "Camino" && !alumnosPintados) {
+                    caminantes?.invoke(batch)
+                    alumnosPintados = true
+                }
             }
+            if (!alumnosPintados) caminantes?.invoke(batch)
         } finally {
             batch.color = Color.WHITE
             batch.end()

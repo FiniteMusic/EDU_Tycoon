@@ -104,7 +104,7 @@ class EventEngine(
         if (edificiosComprados == 0) return
         if (Random.nextFloat() > probabilidadEvento) return
 
-        val disponibles = eventos.filter { it.requiereEdificios <= edificiosComprados }
+        val disponibles = eventos.filter { it.requiereEdificios <= edificiosComprados && it.efecto is EventoEfecto.Gasto } // EDU_PASO4_MAIN_V1
         if (disponibles.isEmpty()) return
 
         val evento = seleccionarEvento(disponibles) ?: return
@@ -124,7 +124,7 @@ class EventEngine(
     private fun aplicarEfecto(evento: GameEvent) {
         when (val efecto = evento.efecto) {
             is EventoEfecto.Gasto   -> GameState.gastar(efecto.cantidad)
-            is EventoEfecto.Ingreso -> GameState.acreditar(efecto.cantidad)
+            is EventoEfecto.Ingreso -> Unit // Deshabilitado: ingreso solo por retos/mininiveles
         }
     }
 }

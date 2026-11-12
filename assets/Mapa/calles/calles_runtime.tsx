@@ -124,4 +124,58 @@
 <tile id="167">
   <image source="auto6.png" width="100" height="65" />
  </tile>
+<tile id="102">
+  <image source="arbol1.png" width="100" height="65" />
+ </tile>
+ <tile id="104">
+  <image source="arbol3.png" width="100" height="65" />
+ </tile>
+ <tile id="105">
+  <image source="arbol4.png" width="100" height="65" />
+ </tile>
+  <tile id="106">
+  <image source="arbol5.png" width="100" height="65" />
+ </tile>
+ <tile id="107">
+  <image source="arbol6.png" width="100" height="65" />
+ </tile>
+  <tile id="110">
+  <image source="camino1.png" width="100" height="65" />
+ </tile>
+   <tile id="116">
+  <image source="palapas1.png" width="100" height="65" />
+ </tile>
+ <tile id="117">
+  <image source="palapas2.png" width="100" height="65" />
+ </tile>
+ <tile id="119">
+  <image source="planta1.png" width="100" height="65" />
+ </tile>
+ <tile id="120">
+  <image source="planta2.png" width="100" height="65" />
+ </tile>
+ <tile id="121">
+  <image source="arbol9.png" width="100" height="65" />
+ </tile>
+ <tile id="122">
+  <image source="bote1.png" width="100" height="65" />
+ </tile>
+ <tile id="128">
+  <image source="arbusto1.png" width="100" height="65" />
+ </tile>
+ <tile id="129">
+  <image source="arbusto2.png" width="100" height="65" />
+ </tile>
+ <tile id="130">
+  <image source="bandera1.png" width="100" height="65" />
+ </tile>
+ <tile id="131">
+  <image source="faro1.png" width="100" height="65" />
+ </tile>
+ <tile id="132">
+  <image source="maceta1.png" width="100" height="65" />
+ </tile>
+  <tile id="135">
+  <image source="maceta3.png" width="100" height="65" />
+ </tile>
 </tileset>

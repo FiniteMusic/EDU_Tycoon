@@ -44,5 +44,6 @@ object GameState {
         ciclosJugados  = 0
         dinero         = presupuestoInicial
         alumnosTotales = 0
+        ProgresoAdministrador.reset() // EDU_PASO4_MAIN_V1
     }
 }

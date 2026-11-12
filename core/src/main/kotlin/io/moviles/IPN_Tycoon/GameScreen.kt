@@ -26,6 +26,7 @@ import com.badlogic.gdx.scenes.scene2d.InputEvent
 import com.badlogic.gdx.scenes.scene2d.InputListener
 import com.badlogic.gdx.scenes.scene2d.ui.Image
 import com.badlogic.gdx.scenes.scene2d.ui.Label
+import com.badlogic.gdx.scenes.scene2d.ui.ProgressBar
 import com.badlogic.gdx.scenes.scene2d.ui.Table
 import com.badlogic.gdx.scenes.scene2d.utils.ClickListener
 import com.badlogic.gdx.utils.Align
@@ -45,6 +46,19 @@ import ktx.scene2d.*
 
 class GameScreen(game: Main) : BaseScreen(game, ExtendViewport(800f, 480f)) {
 
+    // EDU_PASO4_MAIN_V1: recursos audiovisuales y progreso independientes del mapa V7/V3.
+    private val audioAmbiente = AudioAmbiente()
+    private val caminantesCampus = CaminantesCampus()
+    private val animacionesCampus = AnimacionesCampus() // EDU_ANIMACIONES_CAMPUS_V4
+    private var avisoMuerteVisible = false
+    private var energyLabel: Label? = null
+    private var healthLabel: Label? = null
+    private var energyProgress: ProgressBar? = null
+    private var healthProgress: ProgressBar? = null
+    private var knowledgeProgress: ProgressBar? = null
+    private var lastEnergy = -1
+    private var lastHealth = -1
+    private var lastXp = -1
     private var tiempoDiagnosticoFPS = 0f
 
     // El TMX de Android NO contiene las 250,000 celdas de Fondo_pasto.
@@ -340,11 +354,13 @@ class GameScreen(game: Main) : BaseScreen(game, ExtendViewport(800f, 480f)) {
             rotacionExterior = geometria.rotacion ?: entry.bRotation,
             reflejoExteriorX = geometria.reflejoX ?: entry.bFlipX,
             reflejoExteriorY = geometria.reflejoY ?: entry.bFlipY,
+            alReto = { mostrarMinijuego(it) },
             alAdministrar = { mostrarGestion(it) },
             alCerrar = {
                 objectLayerRenderer?.setInteriorFocus(null)
                 interiorAbierto = null
                 restaurarCamaraAnteriorInterior()
+                audioAmbiente.campus()
             }
         )
         // EDU_FIX_INTERIORES_CRASH_V5: si falla cualquier recurso, conservar
@@ -373,6 +389,7 @@ class GameScreen(game: Main) : BaseScreen(game, ExtendViewport(800f, 480f)) {
         currentInfoWindow = null
         interiorAbierto = nuevo
         objectLayerRenderer?.setInteriorFocus(propiedad.id)
+        audioAmbiente.interior(propiedad)
     }
 
     private fun cerrarInterior(): Boolean {
@@ -395,7 +412,12 @@ class GameScreen(game: Main) : BaseScreen(game, ExtendViewport(800f, 480f)) {
                     if (modoCarga && interiorAbierto == null) mostrarGestion(propiedad)
                 }
             },
-            onInteriorRequested = { abrirInterior(it) }
+            onInteriorRequested = { abrirInterior(it) },
+            onChallengeRequested = { mostrarMinijuego(it) },
+            onRestRequested = { VentanaDescanso { hudDirty = true }.mostrarEn(stage) },
+            onFoodRequested = {
+                VentanaComida(it.id == "cafeteria") { hudDirty = true }.mostrarEn(stage)
+            }
         )
         currentInfoWindow?.show(stage)
     }
@@ -407,6 +429,43 @@ class GameScreen(game: Main) : BaseScreen(game, ExtendViewport(800f, 480f)) {
     }
     private var backgroundImage: Image? = null
 
+    private fun mostrarMinijuego(propiedad: Propiedad) {
+        MinijuegoWindow(propiedad) { hudDirty = true }.mostrarEn(stage)
+    }
+
+    private fun mostrarFinDePartida() {
+        if (avisoMuerteVisible) return
+        avisoMuerteVisible = true
+        cerrarInterior()
+        val skin = Scene2DSkin.defaultSkin
+        val dialogo = com.kotcrab.vis.ui.widget.VisWindow("Fin de la partida")
+        dialogo.isModal = true
+        dialogo.add(Label("La salud del administrador llegó a 0. La partida se reiniciará.", skin))
+            .width(380f).pad(16f).row()
+        val reiniciar = com.badlogic.gdx.scenes.scene2d.ui.TextButton("REINICIAR", skin)
+        reiniciar.addListener(object : ClickListener() {
+            override fun clicked(event: InputEvent?, x: Float, y: Float) {
+                dialogo.remove()
+                avisoMuerteVisible = false
+                val slot = GameState.slotActual
+                val terminar = {
+                    ProgresoAdministrador.borrar(slot)
+                    GameState.reset(GameState.presupuestoNuevaPartida())
+                    PropiedadRepository.resetProgress()
+                    modoCarga = false
+                    game.setScreen<SeleccionPartida>()
+                }
+                if (slot in 1..3) game.saveManager.eliminarSlot(slot) { terminar() }
+                else terminar()
+            }
+        })
+        dialogo.add(reiniciar).width(230f).pad(12f)
+        dialogo.pack()
+        dialogo.centerWindow()
+        stage.addActor(dialogo)
+        dialogo.toFront()
+    }
+
     // ── Icono Menú ────────────────────────────────────────────────────
     private val menuIconTexture: Texture by lazy {
         Texture("menuicon.png".toInternalFile()).apply {
@@ -417,10 +476,10 @@ class GameScreen(game: Main) : BaseScreen(game, ExtendViewport(800f, 480f)) {
     // ── HUD ───────────────────────────────────────────────────────────
     private var moneyLabel:       Label? = null
     private var alumnosLabel:     Label? = null
-    private var reputationLabel:  Label? = null
+    private var knowledgeLabel:   Label? = null
     private var lastMoney:        Long = -1
     private var lastStudents:     Int = -1
-    private var lastReputation:   Int = -1
+    private var lastKnowledge:   Int = -1
     private var toastLine1:       Label? = null
     private var toastLine2:       Label? = null
     private var toastTable:       Table? = null
@@ -645,7 +704,9 @@ class GameScreen(game: Main) : BaseScreen(game, ExtendViewport(800f, 480f)) {
     private fun configurarControlesMapa() {
         lastMoney      = -1
         lastStudents   = -1
-        lastReputation = -1
+        lastKnowledge = -1
+        lastXp = -1; lastEnergy = -1; lastHealth = -1
+        audioAmbiente.reanudar()
         cycleTimer     = 0f
         hudDirty       = true
 
@@ -755,6 +816,9 @@ class GameScreen(game: Main) : BaseScreen(game, ExtendViewport(800f, 480f)) {
         Gdx.input.inputProcessor = multiplexer
 
         prepararRenderEntries()
+        caminantesCampus.configurar(map) // EDU_PASO5_CAMINOS
+        animacionesCampus.configurar(map, renderEntries.associate { it.propiedad.id to Vector2(it.bWorldX, it.bWorldY) })
+        audioAmbiente.campus()
         if (!camaraCentradaEnCampus) {
             val centro = getBuildingPos("Biblioteca") ?: getBuildingPos("escom_hitbox")
             if (centro != null) {
@@ -952,20 +1016,8 @@ class GameScreen(game: Main) : BaseScreen(game, ExtendViewport(800f, 480f)) {
         for (entry in renderEntries) {
             if (!entry.propiedad.comprada) continue
             val texture = entry.cachedTex ?: continue
-            val sortY = when (entry.propiedad.id) {
-                "Edificio1" -> menorOrdenY ?: entry.bSortY
-                "Edificio2" -> mayorOrdenY ?: entry.bSortY
-                "Gastronomia" -> gastroAntesY ?: entry.bSortY
-                "cafeteria" -> restauranteDespuesY ?: entry.bSortY
-                else -> entry.bSortY
-            }
-            val sortIndex = when (entry.propiedad.id) {
-                "Edificio1" -> menorIndice ?: entry.bSortIndex
-                "Edificio2" -> mayorIndice ?: entry.bSortIndex
-                "Gastronomia" -> gastroAntesIndice ?: entry.bSortIndex
-                "cafeteria" -> restauranteDespuesIndice ?: entry.bSortIndex
-                else -> entry.bSortIndex
-            }
+            val sortY = entry.bSortY // EDU_TILED_ORDEN_V4
+            val sortIndex = entry.bSortIndex // EDU_TILED_ORDEN_V4
             // Ajustar exclusivamente tamaño visual de mejoras, conservando centro inferior.
             val geometria = geometriaEdificio(entry)
             purchased.add(IsometricObjectLayerRenderer.PurchasedSprite(
@@ -1138,35 +1190,22 @@ class GameScreen(game: Main) : BaseScreen(game, ExtendViewport(800f, 480f)) {
         }
         stage.addActor(eventTable)
 
-        val hudTable = Table().apply {
-            setFillParent(true)
-            top()
-            add(Table().apply {
-                background = whiteDrawable
-                pad(8f)
-                add(Label("$ ", goldStyle))
-                add(moneyLabel).padRight(20f)
-                add(Label("Alumnos: ", cyanStyle))
-                add(alumnosLabel).padRight(20f)
-                add(Label("Reputación: ", goldStyle)).padRight(5f)
-                reputationLabel = Label("0%", goldStyle).apply { setFontScale(1.1f) }
-                add(reputationLabel)
-            }).left().expandX().pad(10f)
-
-            add(scene2d.image(menuIconTexture) {
-                setScaling(Scaling.fit)
-                setAlign(Align.center)
-                addListener(object : ClickListener() {
-                    override fun clicked(event: InputEvent?, x: Float, y: Float) {
-                        PauseMenuWindow(game) {
-                            modoCarga = false
-                            game.setScreen<SeleccionPartida>()
-                        }.show(stage)
-                    }
-                })
-            }).right().pad(10f).size(80f)
+        // EDU_PASO5_HUD: iconos, capsulas, barras reales y diseño compacto.
+        knowledgeLabel = Label("N1 · 0/250 XP", goldStyle)
+        energyLabel = Label("20/20", cyanStyle)
+        healthLabel = Label("100/100", goldStyle)
+        val hud5 = HUDTematico.crear(
+            moneyLabel!!, alumnosLabel!!, knowledgeLabel!!, energyLabel!!, healthLabel!!
+        ) {
+            PauseMenuWindow(game) {
+                modoCarga = false
+                game.setScreen<SeleccionPartida>()
+            }.show(stage)
         }
-        stage.addActor(hudTable)
+        energyProgress = hud5.energia
+        healthProgress = hud5.salud
+        knowledgeProgress = hud5.xp
+        stage.addActor(hud5.raiz)
     }
 
     // ── Render ────────────────────────────────────────────────────────
@@ -1190,7 +1229,9 @@ class GameScreen(game: Main) : BaseScreen(game, ExtendViewport(800f, 480f)) {
             }
             actualizarCicloDeJuego(delta)
             actualizarIndicadoresHUD()
+            if (ProgresoAdministrador.avanzarTiempo(delta)) mostrarFinDePartida()
         }
+        audioAmbiente.actualizar(delta)
 
         if (modoCarga) {
             tiempoDiagnosticoFPS += delta
@@ -1326,7 +1367,14 @@ class GameScreen(game: Main) : BaseScreen(game, ExtendViewport(800f, 480f)) {
         // no procesa TiledMapTileMapObject de las capas de objetos.
         // Capas y objetos en el mismo orden que Tiled; edificios comprados
         // intercalados con el resto de la capa Edificios.
-        objectLayerRenderer?.render(r.batch, camera)
+        objectLayerRenderer?.render(r.batch, camera) { batch ->
+            caminantesCampus.dibujarEnBatch(batch, camera, delta)
+        } // EDU_PASO5_PROFUNDIDAD
+        // Tráfico (asfalto exterior), aves y helicópteros POR ENCIMA de arbustos.
+        animacionesCampus.actualizar(delta)
+        r.batch.begin()
+        try { animacionesCampus.dibujar(r.batch, camera) }
+        finally { r.batch.end() }
 
         r.batch.begin()
         try {
@@ -1389,7 +1437,7 @@ class GameScreen(game: Main) : BaseScreen(game, ExtendViewport(800f, 480f)) {
             cycleTimer -= cycleDuration
             cycleEngine.advanceCycle()
             hudDirty = true   // El ciclo cambia dinero/alumnos → invalidar caché HUD
-            economyEngine.lastResult?.let { showCycleToast(it) }
+            // Paso 4: el dinero solo procede de completar retos.
         }
     }
 
@@ -1410,23 +1458,30 @@ class GameScreen(game: Main) : BaseScreen(game, ExtendViewport(800f, 480f)) {
             alumnosLabel?.setText(formatAlumnos(lastStudents))
         }
 
-        val reputation = if (cachedTotalMaxLevel > 0) {
-            ((cachedCurrentLevel.toFloat() / cachedTotalMaxLevel) * 100).toInt().coerceIn(0, 100)
-        } else 0
-
-        if (reputation != lastReputation) {
-            lastReputation = reputation
-            reputationLabel?.setText("$lastReputation%")
-            reputationLabel?.color = when {
-                reputation >= 80 -> Color.GOLD
-                reputation >= 50 -> Color.YELLOW
-                else             -> Color.WHITE
-            }
+        if (lastXp != ProgresoAdministrador.experiencia) {
+            lastXp = ProgresoAdministrador.experiencia
+            lastKnowledge = ProgresoAdministrador.nivelConocimiento
+            knowledgeLabel?.setText("N${ProgresoAdministrador.nivelConocimiento} · ${ProgresoAdministrador.xpNivel}/${ProgresoAdministrador.xpSiguienteNivel} XP")
+            knowledgeProgress?.setRange(0f, ProgresoAdministrador.xpSiguienteNivel.toFloat())
+            knowledgeProgress?.value = ProgresoAdministrador.xpNivel.toFloat()
+        }
+        if (lastEnergy != ProgresoAdministrador.energia) {
+            lastEnergy = ProgresoAdministrador.energia
+            energyLabel?.setText("${lastEnergy}/20")
+            energyProgress?.value = lastEnergy.toFloat()
+            energyLabel?.color = if (lastEnergy <= 4) Color.ORANGE else Color.CYAN
+        }
+        if (lastHealth != ProgresoAdministrador.salud) {
+            lastHealth = ProgresoAdministrador.salud
+            healthLabel?.setText("${lastHealth}/100")
+            healthProgress?.value = lastHealth.toFloat()
+            healthLabel?.color = if (lastHealth <= 25) Color.RED else Color.GREEN
         }
     }
 
     // ── Resize / Dispose ──────────────────────────────────────────────
     override fun hide() {
+        audioAmbiente.suspender()
         cerrarInterior()
         super.hide()
     }
@@ -1453,6 +1508,10 @@ class GameScreen(game: Main) : BaseScreen(game, ExtendViewport(800f, 480f)) {
         fondoPastoRapido?.dispose()
         renderer?.dispose()
         map?.dispose()
+        audioAmbiente.dispose()
+        caminantesCampus.dispose()
+        animacionesCampus.dispose()
+        UIEstiloPaso5.dispose() // EDU_PASO5_RECURSOS
     }
 
     // ── Tutorial ──────────────────────────────────────────────────────
@@ -1475,7 +1534,7 @@ class GameScreen(game: Main) : BaseScreen(game, ExtendViewport(800f, 480f)) {
                 },
                 Dialogo("Ing. Cárdenas", "Mira arriba a la izquierda. Ese es tu Presupuesto. Úsalo sabiamente para expandir el campus.", "sprite_explicando.png"),
                 Dialogo("Ing. Cárdenas", "A su lado verás el número de Alumnos. Entre más y mejores edificios tengas, más estudiantes atraerás.", "sprite_hablando.png"),
-                Dialogo("Ing. Cárdenas", "La Reputación indica el progreso global de tu institución. ¡Tu meta es alcanzar el 100%!", "sprite_serio.png"),
+                Dialogo("Ing. Cárdenas", "El Conocimiento crece al superar retos. Cuida tu energía y salud para continuar.", "sprite_serio.png"),
                 Dialogo("Ing. Cárdenas", "Para crecer, simplemente toca cualquier edificio o terreno en el mapa.", "sprite_hablando.png") {
                     posEscom?.let {
                         targetCameraPos.set(it.x, it.y, 0f)
@@ -1484,7 +1543,7 @@ class GameScreen(game: Main) : BaseScreen(game, ExtendViewport(800f, 480f)) {
                     }
                 },
                 Dialogo("Ing. Cárdenas", "Al tocar un lugar como la ESCOM, se abrirá una ventana para comprarlo o subirlo de nivel.", "sprite_explicando.png"),
-                Dialogo("Ing. Cárdenas", "Subir de nivel un edificio aumenta su capacidad de alumnos y la reputación de la escuela.", "sprite_hablando.png") {
+                Dialogo("Ing. Cárdenas", "Para mejorar edificios necesitas conocimiento obtenido en sus retos temáticos.", "sprite_hablando.png") {
                     posDireccion?.let {
                         targetCameraPos.set(it.x, it.y, 0f)
                         initialZoom = 4f; camera.zoom = 4f

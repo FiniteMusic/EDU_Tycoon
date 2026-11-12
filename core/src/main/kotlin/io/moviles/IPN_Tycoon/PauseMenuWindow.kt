@@ -23,6 +23,7 @@ class PauseMenuWindow(
             saveBtn.onChange {
                 if (GameState.slotActual == 0) {
                     SaveSelectionWindow(game) { ok ->
+                        if (ok) ProgresoAdministrador.guardar(GameState.slotActual)
                         saveBtn.setText(if (ok) "Guardado correctamente" else "Error al guardar")
                     }.show(stage)
                     return@onChange
@@ -31,6 +32,7 @@ class PauseMenuWindow(
                 saveBtn.isDisabled = true
                 saveBtn.setText("Guardando...")
                 game.saveManager.guardar(GameState.slotActual) { ok ->
+                    if (ok) ProgresoAdministrador.guardar(GameState.slotActual)
                     saveBtn.setText(if (ok) "Guardado correctamente" else "Error al guardar")
                     saveBtn.isDisabled = false
                 }
@@ -78,7 +80,6 @@ class StatsWindow : VisWindow("Estadísticas") {
         val edificios     = PropiedadRepository.propiedades.values.count { it.comprada }
         val alumnos       = PropiedadRepository.propiedades.values
             .filter { it.comprada }.sumOf { it.baseAlumnos * it.nivel }
-        val ingresosCiclo = alumnos * 100L
 
         add(scene2d.table {
 
@@ -94,8 +95,11 @@ class StatsWindow : VisWindow("Estadísticas") {
             label("$alumnos").cell(padBottom = 8f)
             row()
 
-            label("Ingresos/ciclo:") { color = Color.YELLOW }.cell(padRight = 10f, padBottom = 8f)
-            label("\$${fmt(ingresosCiclo)}").cell(padBottom = 8f)
+            label("Conocimiento:") { color = Color.YELLOW }.cell(padRight = 10f, padBottom = 8f)
+            label("Nivel ${ProgresoAdministrador.nivelConocimiento} (${ProgresoAdministrador.experiencia} XP)").cell(padBottom = 8f)
+            row()
+            label("Energía / Salud:") { color = Color.GREEN }.cell(padRight = 10f, padBottom = 8f)
+            label("${ProgresoAdministrador.energia}/20 · ${ProgresoAdministrador.salud}/100").cell(padBottom = 8f)
             row()
 
             label("Ciclos:") { color = Color.LIGHT_GRAY }.cell(padRight = 10f, padBottom = 8f)
