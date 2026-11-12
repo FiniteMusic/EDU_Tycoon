@@ -87,7 +87,7 @@ class SeleccionPartida(game: Main) : BaseScreen(game) {
                         textButton("NUEVA PARTIDA") {
                             style = customButtonStyle
                             onChange {
-                                GameState.reset(GameState.DINERO_INICIAL_REAL)
+                                GameState.reset(GameState.presupuestoNuevaPartida())
                                 PropiedadRepository.resetProgress()
                                 val screen = game.getScreen<GameScreen>()
                                 screen.modoCarga = false

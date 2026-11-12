@@ -6,7 +6,7 @@ import ktx.app.KtxScreen
 import ktx.async.KtxAsync
 import ktx.scene2d.Scene2DSkin
 
-class Main(val saveManager: GameSaveManager) : KtxGame<KtxScreen>() {
+class Main(val saveManager: GameSaveManager, val modoPruebasAndroid: Boolean = false) : KtxGame<KtxScreen>() {
     override fun create() {
         KtxAsync.initiate()
         VisUI.load()

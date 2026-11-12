@@ -28,9 +28,8 @@ class SaveSelectionWindow(
     }
 
     private fun buildUI(s1: GameSaveData?, s2: GameSaveData?, s3: GameSaveData?) {
-        clearChildren()
-        addCloseButton()
-
+        // EDU_FIX_GUARDADO_CIERRE_V1: el botón X se añade una sola vez en init.
+        // No vaciar la ventana: clearChildren() destruía parte del encabezado.
         add(scene2d.table {
             defaults().pad(10f)
 
@@ -40,6 +39,23 @@ class SaveSelectionWindow(
             addSlotUI(this, 2, s2)
             // Slot 3
             addSlotUI(this, 3, s3)
+
+            row()
+            if (s1 != null && s2 != null && s3 != null) {
+                label("Los tres slots están ocupados. Regresa al menú sin modificar tus partidas.") {
+                    color = Color.LIGHT_GRAY
+                    setWrap(true)
+                    setAlignment(com.badlogic.gdx.utils.Align.center)
+                }.cell(colspan = 3, width = 510f, padTop = 10f)
+                row()
+            }
+
+            // Siempre disponible, incluso si no queda ningún slot libre.
+            textButton("CERRAR / VOLVER") {
+                onChange {
+                    this@SaveSelectionWindow.remove()
+                }
+            }.cell(colspan = 3, fillX = true, padTop = 12f, height = 42f)
 
         }).pad(10f)
 
@@ -76,6 +92,7 @@ class SaveSelectionWindow(
                         game.saveManager.guardar(slotNum) { ok ->
                             if (ok) {
                                 GameState.slotActual = slotNum
+                                ProgresoAdministrador.guardar(slotNum) // EDU_PASO4_MAIN_V1
                                 onSaveComplete(true)
                                 this@SaveSelectionWindow.remove()
                             } else {
